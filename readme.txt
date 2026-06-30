@@ -4,7 +4,7 @@ Tags: internal links, seo, automatic linking, interlinking, keywords
 Requires at least: 5.8
 Tested up to: 6.5
 Requires PHP: 7.4
-Stable tag: 0.4.0
+Stable tag: 0.5.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -36,13 +36,23 @@ keyword configuration and the front-end linking engine.
 == How linking works ==
 
 1. You configure keywords on a *target* (the post/page/term you want links to
-   point to).
+   point to), via the post metabox or the term edit screen.
 2. The plugin builds an index that maps each keyword to its target.
 3. When any other post is rendered, its content is scanned for those keywords
    and matches are replaced with a link to the target, applying all configured
    limits. The original content in the database is never changed.
 
 == Changelog ==
+
+= 0.5.0 =
+* Add per-term keyword configuration on the add/edit screens of whitelisted
+  taxonomies (keywords, overrides and content blacklist).
+* Terms now act as link sources too: their descriptions are linked on the
+  front end and processed by the generator.
+* Link selected post and term custom fields on display (only the configured
+  meta keys, front-end only, with an ilb_link_custom_fields filter to disable).
+* Apply the per-target overrides "limit outgoing links" (source) and
+  "limit links per paragraph" (target) in the engine.
 
 = 0.4.0 =
 * Add the link graph / statistics table (wp_ilb_links) and a batched generator

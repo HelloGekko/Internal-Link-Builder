@@ -2,11 +2,15 @@
 /**
  * Front-end linking engine.
  *
- * Scans post content on `the_content` and turns configured keywords into links
- * to their target, on the fly. The stored content is never modified.
+ * Turns configured keywords into links to their target, on the fly, in post
+ * content, term descriptions and (optionally) selected custom fields. The stored
+ * content is never modified.
  *
  * Parsing is done with DOMDocument so replacements only ever happen inside text
  * nodes — never inside tags, attributes, existing links or excluded HTML areas.
+ *
+ * A "source" throughout this class is an array: array( 'id' => int, 'type' =>
+ * 'post'|'term' ).
  *
  * @package InternalLinkBuilder
  */
@@ -59,6 +63,20 @@ class ILB_Engine {
 	private $target_cache = array();
 
 	/**
+	 * Per-request cache of per-target override settings, keyed by "type:id".
+	 *
+	 * @var array
+	 */
+	private $override_cache = array();
+
+	/**
+	 * Re-entrancy guard for the custom-field meta filters.
+	 *
+	 * @var bool
+	 */
+	private $meta_guard = false;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param ILB_Settings $settings Settings handler.
@@ -74,7 +92,23 @@ class ILB_Engine {
 
 		// Run after wpautop (priority 10) so paragraphs exist as <p> elements.
 		add_filter( 'the_content', array( $this, 'filter_content' ), 20 );
+		add_filter( 'get_the_archive_description', array( $this, 'filter_term_description' ), 20 );
+
+		// Custom-field linking: only hook the (hot) meta filters when at least
+		// one custom field is configured, to avoid site-wide overhead otherwise.
+		if ( ! empty( (array) $this->settings->get( 'post_custom_fields' ) ) ) {
+			add_filter( 'get_post_metadata', array( $this, 'filter_post_meta' ), 20, 4 );
+		}
+		if ( ! empty( (array) $this->settings->get( 'term_custom_fields' ) ) ) {
+			add_filter( 'get_term_metadata', array( $this, 'filter_term_meta' ), 20, 4 );
+		}
 	}
+
+	/*
+	 * -------------------------------------------------------------------------
+	 * Front-end filters
+	 * -------------------------------------------------------------------------
+	 */
 
 	/**
 	 * The `the_content` filter entry point.
@@ -92,22 +126,27 @@ class ILB_Engine {
 		}
 
 		$post = get_post();
-		if ( ! $post instanceof WP_Post || ! $this->is_source_allowed( $post ) ) {
+		if ( ! $post instanceof WP_Post || ! $this->is_post_source_allowed( $post ) ) {
 			return $content;
 		}
+
+		$source = array(
+			'id'   => (int) $post->ID,
+			'type' => 'post',
+		);
 
 		// Serve from cache when enabled and fresh.
 		$use_cache   = (bool) $this->settings->get( 'cache' );
 		$fingerprint = '';
 		if ( $use_cache ) {
-			$fingerprint = $this->fingerprint( $content, $post );
+			$fingerprint = $this->fingerprint( $content, $post->ID );
 			$cached      = get_post_meta( $post->ID, self::CACHE_META, true );
 			if ( is_array( $cached ) && isset( $cached['key'] ) && $cached['key'] === $fingerprint ) {
 				return $cached['html'];
 			}
 		}
 
-		$result = $this->process( $content, $post );
+		$result = $this->link_html( $content, $source );
 
 		if ( $use_cache ) {
 			update_post_meta(
@@ -124,14 +163,213 @@ class ILB_Engine {
 	}
 
 	/**
-	 * Computes the cache fingerprint for a post's content.
+	 * Links keywords inside a term archive description.
 	 *
-	 * @param string  $content Post content.
-	 * @param WP_Post $post    Source post.
+	 * @param string $description Archive description HTML.
 	 * @return string
 	 */
-	private function fingerprint( $content, $post ) {
-		return md5( $content . '|' . ILB_Index::token() . '|' . wp_json_encode( $this->settings->all() ) . '|' . $post->ID );
+	public function filter_term_description( $description ) {
+		if ( is_admin() || '' === trim( (string) $description ) ) {
+			return $description;
+		}
+
+		$term = get_queried_object();
+		if ( ! $term instanceof WP_Term || ! $this->is_term_source_allowed( $term ) ) {
+			return $description;
+		}
+
+		return $this->link_html(
+			$description,
+			array(
+				'id'   => (int) $term->term_id,
+				'type' => 'term',
+			)
+		);
+	}
+
+	/**
+	 * Links keywords inside selected post custom fields on display.
+	 *
+	 * Only the meta keys configured under "Custom fields of posts that get used
+	 * for linking" are affected, and only on front-end page views. Returns null
+	 * to let WordPress read the value normally when nothing should change.
+	 *
+	 * @param mixed  $value     Short-circuit value (null by default).
+	 * @param int    $object_id Post ID.
+	 * @param string $meta_key  Meta key.
+	 * @param bool   $single    Whether a single value was requested.
+	 * @return mixed
+	 */
+	public function filter_post_meta( $value, $object_id, $meta_key, $single ) {
+		return $this->filter_object_meta( $value, $object_id, $meta_key, $single, 'post' );
+	}
+
+	/**
+	 * Links keywords inside selected term custom fields on display.
+	 *
+	 * @param mixed  $value     Short-circuit value (null by default).
+	 * @param int    $object_id Term ID.
+	 * @param string $meta_key  Meta key.
+	 * @param bool   $single    Whether a single value was requested.
+	 * @return mixed
+	 */
+	public function filter_term_meta( $value, $object_id, $meta_key, $single ) {
+		return $this->filter_object_meta( $value, $object_id, $meta_key, $single, 'term' );
+	}
+
+	/**
+	 * Shared custom-field meta filter for posts and terms.
+	 *
+	 * @param mixed  $value     Short-circuit value.
+	 * @param int    $object_id Object ID.
+	 * @param string $meta_key  Meta key.
+	 * @param bool   $single    Whether a single value was requested.
+	 * @param string $type      'post' or 'term'.
+	 * @return mixed
+	 */
+	private function filter_object_meta( $value, $object_id, $meta_key, $single, $type ) {
+		if ( $this->meta_guard || is_admin() || wp_doing_ajax() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) ) {
+			return $value;
+		}
+
+		$setting = ( 'term' === $type ) ? 'term_custom_fields' : 'post_custom_fields';
+		$fields  = (array) $this->settings->get( $setting );
+		if ( empty( $fields ) || ! in_array( $meta_key, $fields, true ) ) {
+			return $value;
+		}
+
+		/**
+		 * Allows disabling automatic linking of custom fields.
+		 *
+		 * @param bool   $enabled  Whether to link this field.
+		 * @param string $meta_key Meta key.
+		 * @param int    $object_id Object ID.
+		 * @param string $type     'post' or 'term'.
+		 */
+		if ( ! apply_filters( 'ilb_link_custom_fields', true, $meta_key, $object_id, $type ) ) {
+			return $value;
+		}
+
+		$source = array(
+			'id'   => (int) $object_id,
+			'type' => $type,
+		);
+		if ( ! $this->is_source_allowed( $source ) ) {
+			return $value;
+		}
+
+		// Hold the guard across the whole operation so neither the raw read nor
+		// the linking work re-enters this filter for the same field.
+		$this->meta_guard = true;
+		$raw              = get_metadata_raw( $type, $object_id, $meta_key, $single );
+
+		if ( null === $raw || '' === $raw || array() === $raw ) {
+			$this->meta_guard = false;
+			return $value;
+		}
+
+		if ( is_array( $raw ) ) {
+			$result = array_map(
+				function ( $item ) use ( $source ) {
+					return is_string( $item ) ? $this->link_html( $item, $source ) : $item;
+				},
+				$raw
+			);
+		} else {
+			$result = is_string( $raw ) ? $this->link_html( $raw, $source ) : $value;
+		}
+
+		$this->meta_guard = false;
+
+		return $result;
+	}
+
+	/**
+	 * Computes the cache fingerprint for a post's content.
+	 *
+	 * @param string $content Post content.
+	 * @param int    $post_id Source post ID.
+	 * @return string
+	 */
+	private function fingerprint( $content, $post_id ) {
+		return md5( $content . '|' . ILB_Index::token() . '|' . wp_json_encode( $this->settings->all() ) . '|' . $post_id );
+	}
+
+	/*
+	 * -------------------------------------------------------------------------
+	 * Public computation (used by the generator)
+	 * -------------------------------------------------------------------------
+	 */
+
+	/**
+	 * Computes the links a source post would generate, without rendering.
+	 *
+	 * @param WP_Post $post Source post.
+	 * @return array[] List of links: each [target_id, target_type, keyword].
+	 */
+	public function compute_links( WP_Post $post ) {
+		if ( ! $this->is_post_source_allowed( $post ) ) {
+			return array();
+		}
+
+		// Approximate the rendered structure: paragraphs via wpautop, without
+		// executing shortcodes (which may have side effects during generation).
+		$content = wpautop( $post->post_content );
+
+		return $this->extract_links(
+			$content,
+			array(
+				'id'   => (int) $post->ID,
+				'type' => 'post',
+			)
+		);
+	}
+
+	/**
+	 * Computes the links a source term (its description) would generate.
+	 *
+	 * @param WP_Term $term Source term.
+	 * @return array[] List of links: each [target_id, target_type, keyword].
+	 */
+	public function compute_links_for_term( WP_Term $term ) {
+		if ( ! $this->is_term_source_allowed( $term ) ) {
+			return array();
+		}
+
+		$content = wpautop( $term->description );
+
+		return $this->extract_links(
+			$content,
+			array(
+				'id'   => (int) $term->term_id,
+				'type' => 'term',
+			)
+		);
+	}
+
+	/**
+	 * Resolves content and returns the flat link list for the graph.
+	 *
+	 * @param string $content Content to scan.
+	 * @param array  $source  Source descriptor.
+	 * @return array[]
+	 */
+	private function extract_links( $content, array $source ) {
+		$resolved = $this->resolve( $content, $source );
+		if ( ! $resolved ) {
+			return array();
+		}
+
+		$links = array();
+		foreach ( $resolved['accepted'] as $placement ) {
+			$links[] = array(
+				'target_id'   => $placement['target']['id'],
+				'target_type' => $placement['target']['type'],
+				'keyword'     => $placement['anchor'],
+			);
+		}
+
+		return $links;
 	}
 
 	/*
@@ -141,12 +379,28 @@ class ILB_Engine {
 	 */
 
 	/**
+	 * Whether a source descriptor is allowed to link out.
+	 *
+	 * @param array $source Source descriptor.
+	 * @return bool
+	 */
+	private function is_source_allowed( array $source ) {
+		if ( 'term' === $source['type'] ) {
+			$term = get_term( $source['id'] );
+			return $term instanceof WP_Term && $this->is_term_source_allowed( $term );
+		}
+
+		$post = get_post( $source['id'] );
+		return $post instanceof WP_Post && $this->is_post_source_allowed( $post );
+	}
+
+	/**
 	 * Whether a post is allowed to link out to others.
 	 *
 	 * @param WP_Post $post Source post.
 	 * @return bool
 	 */
-	private function is_source_allowed( $post ) {
+	private function is_post_source_allowed( $post ) {
 		$post_types = (array) $this->settings->get( 'whitelist_post_types' );
 		if ( ! in_array( $post->post_type, $post_types, true ) ) {
 			return false;
@@ -165,7 +419,32 @@ class ILB_Engine {
 			}
 		}
 
-		$overrides = $this->keywords->get_target_settings( $post->ID, 'post' );
+		$overrides = $this->get_overrides( $post->ID, 'post' );
+		if ( ! empty( $overrides['on_global_blacklist'] ) ) {
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
+	 * Whether a term is allowed to link out from its description.
+	 *
+	 * @param WP_Term $term Source term.
+	 * @return bool
+	 */
+	private function is_term_source_allowed( $term ) {
+		$taxonomies = (array) $this->settings->get( 'whitelist_taxonomies' );
+		if ( ! in_array( $term->taxonomy, $taxonomies, true ) ) {
+			return false;
+		}
+
+		$blacklist = array_map( 'intval', (array) $this->settings->get( 'blacklist_terms' ) );
+		if ( in_array( (int) $term->term_id, $blacklist, true ) ) {
+			return false;
+		}
+
+		$overrides = $this->get_overrides( $term->term_id, 'term' );
 		if ( ! empty( $overrides['on_global_blacklist'] ) ) {
 			return false;
 		}
@@ -180,15 +459,15 @@ class ILB_Engine {
 	 */
 
 	/**
-	 * Builds the ordered candidate list for a source post.
+	 * Builds the ordered candidate list for a source.
 	 *
-	 * @param WP_Post $post Source post.
+	 * @param array $source Source descriptor.
 	 * @return array {
-	 *     @type array  $candidates Ordered list of candidates (keyword, lower, rank, targets[]).
-	 *     @type array  $lookup     Map of lowercased keyword => candidate.
+	 *     @type array $candidates Ordered candidates (keyword, lower, rank, targets[]).
+	 *     @type array $lookup     Map of lowercased keyword => candidate.
 	 * }
 	 */
-	private function get_candidates( $post ) {
+	private function get_candidates( array $source ) {
 		$rows = $this->index->all_rows();
 		if ( empty( $rows ) ) {
 			return array(
@@ -197,8 +476,8 @@ class ILB_Engine {
 			);
 		}
 
-		// Keywords the source post explicitly excludes from linking.
-		$blocked = array_map( 'strtolower', $this->keywords->get_content_blacklist( $post->ID, 'post' ) );
+		// Keywords the source explicitly excludes from linking in its content.
+		$blocked = array_map( 'strtolower', $this->keywords->get_content_blacklist( $source['id'], $source['type'] ) );
 		$blocked = array_flip( $blocked );
 
 		$by_keyword = array();
@@ -229,9 +508,8 @@ class ILB_Engine {
 
 		$lookup = array();
 		foreach ( $candidates as $rank => $candidate ) {
-			$candidate['rank']                    = $rank;
-			$candidates[ $rank ]['rank']          = $rank;
-			$lookup[ $candidate['lower'] ]        = $candidates[ $rank ];
+			$candidates[ $rank ]['rank']   = $rank;
+			$lookup[ $candidate['lower'] ] = $candidates[ $rank ];
 		}
 
 		return array(
@@ -290,14 +568,14 @@ class ILB_Engine {
 	 */
 
 	/**
-	 * Generates linked HTML for the given content.
+	 * Returns the content with generated links applied (or unchanged).
 	 *
-	 * @param string  $content Post content.
-	 * @param WP_Post $post    Source post.
+	 * @param string $content Content to process.
+	 * @param array  $source  Source descriptor.
 	 * @return string
 	 */
-	private function process( $content, $post ) {
-		$resolved = $this->resolve( $content, $post );
+	private function link_html( $content, array $source ) {
+		$resolved = $this->resolve( $content, $source );
 		if ( ! $resolved || empty( $resolved['accepted'] ) ) {
 			return $content;
 		}
@@ -308,49 +586,15 @@ class ILB_Engine {
 	}
 
 	/**
-	 * Computes the links a source post would generate, without rendering.
-	 *
-	 * Used by the generator to build the link graph. Runs the exact same
-	 * matching and limit pipeline as the front-end render.
-	 *
-	 * @param WP_Post $post Source post.
-	 * @return array[] List of links: each [target_id, target_type, keyword].
-	 */
-	public function compute_links( WP_Post $post ) {
-		if ( ! $this->is_source_allowed( $post ) ) {
-			return array();
-		}
-
-		// Approximate the rendered structure: paragraphs via wpautop, without
-		// executing shortcodes (which may have side effects during generation).
-		$content  = wpautop( $post->post_content );
-		$resolved = $this->resolve( $content, $post );
-		if ( ! $resolved ) {
-			return array();
-		}
-
-		$links = array();
-		foreach ( $resolved['accepted'] as $placement ) {
-			$links[] = array(
-				'target_id'   => $placement['target']['id'],
-				'target_type' => $placement['target']['type'],
-				'keyword'     => $placement['anchor'],
-			);
-		}
-
-		return $links;
-	}
-
-	/**
 	 * Runs the matching pipeline and returns the DOM, root and accepted
 	 * placements.
 	 *
-	 * @param string  $content Content to scan.
-	 * @param WP_Post $post    Source post.
+	 * @param string $content Content to scan.
+	 * @param array  $source  Source descriptor.
 	 * @return array|null
 	 */
-	private function resolve( $content, $post ) {
-		$data       = $this->get_candidates( $post );
+	private function resolve( $content, array $source ) {
+		$data       = $this->get_candidates( $source );
 		$candidates = $data['candidates'];
 		$lookup     = $data['lookup'];
 		if ( empty( $candidates ) ) {
@@ -402,7 +646,7 @@ class ILB_Engine {
 		}
 
 		$placements = $this->collect_placements( $text_nodes, $pattern, $lookup );
-		$accepted   = $this->select_placements( $placements, $post, $existing_urls );
+		$accepted   = $this->select_placements( $placements, $source, $existing_urls );
 
 		return array(
 			'dom'      => $dom,
@@ -414,7 +658,7 @@ class ILB_Engine {
 	/**
 	 * Loads content into a DOMDocument wrapped in a known root element.
 	 *
-	 * @param string $content Post content.
+	 * @param string $content Content.
 	 * @return DOMDocument|null
 	 */
 	private function load_dom( $content ) {
@@ -422,7 +666,7 @@ class ILB_Engine {
 			return null;
 		}
 
-		$dom = new DOMDocument();
+		$dom  = new DOMDocument();
 		$prev = libxml_use_internal_errors( true );
 		$ok   = $dom->loadHTML(
 			'<?xml encoding="UTF-8">' . '<div id="ilb-root">' . $content . '</div>',
@@ -480,8 +724,6 @@ class ILB_Engine {
 			}
 		}
 
-		// The wrapper div is always excluded as a tag name, but its descendants
-		// are walked; so we deliberately do not add "div" unless configured.
 		return $excluded;
 	}
 
@@ -489,8 +731,8 @@ class ILB_Engine {
 	 * Determines a text node's paragraph bucket, or null when it is not
 	 * linkable (inside an excluded area).
 	 *
-	 * @param DOMNode             $node     Text node.
-	 * @param array<string,bool>  $excluded Excluded tag names.
+	 * @param DOMNode            $node     Text node.
+	 * @param array<string,bool> $excluded Excluded tag names.
 	 * @return string|null
 	 */
 	private function paragraph_key( $node, array $excluded ) {
@@ -590,7 +832,6 @@ class ILB_Engine {
 					continue;
 				}
 
-				$candidate    = $lookup[ $lower ];
 				$placements[] = array(
 					'node'      => $entry['node'],
 					'node_idx'  => $entry['index'],
@@ -598,7 +839,7 @@ class ILB_Engine {
 					'offset'    => $offset,
 					'length'    => strlen( $matched_text ),
 					'anchor'    => $matched_text,
-					'candidate' => $candidate,
+					'candidate' => $lookup[ $lower ],
 				);
 			}
 		}
@@ -609,18 +850,29 @@ class ILB_Engine {
 	/**
 	 * Selects which placements to apply, honouring all link limits.
 	 *
-	 * @param array   $placements    Potential placements.
-	 * @param WP_Post $post          Source post.
-	 * @param array   $existing_urls URLs already linked in the content.
+	 * @param array $placements    Potential placements.
+	 * @param array $source        Source descriptor.
+	 * @param array $existing_urls URLs already linked in the content.
 	 * @return array[] Accepted placements, with a resolved target attached.
 	 */
-	private function select_placements( array $placements, $post, array $existing_urls ) {
+	private function select_placements( array $placements, array $source, array $existing_urls ) {
 		$unlimited = (bool) $this->settings->get( 'link_as_often_as_possible' );
+
+		$source_overrides = $this->get_overrides( $source['id'], $source['type'] );
 
 		$max_post      = $unlimited ? 0 : (int) $this->settings->get( 'max_links_per_post' );
 		$limit_para    = ! $unlimited && $this->settings->get( 'limit_links_per_paragraph' );
 		$max_para      = (int) $this->settings->get( 'max_links_per_paragraph' );
 		$max_frequency = $unlimited ? 0 : (int) $this->settings->get( 'max_link_frequency' );
+
+		// Per-target override: a source flagged "limit outgoing links" always
+		// honours the per-post cap, even when "link as often as possible" is on.
+		if ( ! empty( $source_overrides['limit_outgoing_links'] ) ) {
+			$configured_max = (int) $this->settings->get( 'max_links_per_post' );
+			if ( $configured_max > 0 ) {
+				$max_post = $configured_max;
+			}
+		}
 
 		// Priority ordering: by keyword rank, then document order.
 		usort(
@@ -635,31 +887,40 @@ class ILB_Engine {
 			}
 		);
 
-		$total          = 0;
-		$per_paragraph  = array();
-		$per_target     = array();
-		$used_urls      = $existing_urls;
-		$accepted       = array();
-		$source_terms   = $this->source_terms( $post );
+		$total             = 0;
+		$per_paragraph     = array();
+		$per_target_para   = array();
+		$per_target        = array();
+		$used_urls         = $existing_urls;
+		$accepted          = array();
+		$source_terms      = $this->source_terms( $source );
 
 		foreach ( $placements as $placement ) {
 			if ( $max_post > 0 && $total >= $max_post ) {
 				break;
 			}
 
-			if ( $limit_para ) {
-				$para = $placement['paragraph'];
-				if ( isset( $per_paragraph[ $para ] ) && $per_paragraph[ $para ] >= $max_para ) {
-					continue;
-				}
+			$para = $placement['paragraph'];
+			if ( $limit_para && isset( $per_paragraph[ $para ] ) && $per_paragraph[ $para ] >= $max_para ) {
+				continue;
 			}
 
-			$target = $this->choose_target( $placement['candidate'], $post, $source_terms, $used_urls, $per_target, $max_frequency, $unlimited );
+			$target = $this->choose_target( $placement['candidate'], $source, $source_terms, $used_urls, $per_target, $max_frequency, $unlimited );
 			if ( ! $target ) {
 				continue;
 			}
 
 			$key = $target['type'] . ':' . $target['id'];
+
+			// Per-target override: limit links to this target per paragraph.
+			$target_overrides = $this->get_overrides( $target['id'], $target['type'] );
+			if ( ! $unlimited && ! empty( $target_overrides['limit_links_per_paragraph'] ) ) {
+				$tp_key = $key . '|' . $para;
+				if ( isset( $per_target_para[ $tp_key ] ) && $per_target_para[ $tp_key ] >= $max_para ) {
+					continue;
+				}
+				$per_target_para[ $tp_key ] = isset( $per_target_para[ $tp_key ] ) ? $per_target_para[ $tp_key ] + 1 : 1;
+			}
 
 			// Commit.
 			$accepted[] = array(
@@ -674,7 +935,6 @@ class ILB_Engine {
 			$per_target[ $key ] = isset( $per_target[ $key ] ) ? $per_target[ $key ] + 1 : 1;
 			$used_urls[ $this->normalize_url( $target['url'] ) ] = true;
 			if ( $limit_para ) {
-				$para                   = $placement['paragraph'];
 				$per_paragraph[ $para ] = isset( $per_paragraph[ $para ] ) ? $per_paragraph[ $para ] + 1 : 1;
 			}
 		}
@@ -685,19 +945,19 @@ class ILB_Engine {
 	/**
 	 * Picks the first eligible target for a candidate keyword.
 	 *
-	 * @param array   $candidate     Candidate definition.
-	 * @param WP_Post $post          Source post.
-	 * @param array   $source_terms  Source terms keyed by limiting taxonomy.
-	 * @param array   $used_urls     URLs already linked/selected.
-	 * @param array   $per_target    Per-target frequency counters.
-	 * @param int     $max_frequency Max links per target (0 = unlimited).
-	 * @param bool    $unlimited     Whether "link as often as possible" is on.
+	 * @param array $candidate     Candidate definition.
+	 * @param array $source        Source descriptor.
+	 * @param array $source_terms  Source terms keyed by limiting taxonomy.
+	 * @param array $used_urls     URLs already linked/selected.
+	 * @param array $per_target    Per-target frequency counters.
+	 * @param int   $max_frequency Max links per target (0 = unlimited).
+	 * @param bool  $unlimited     Whether "link as often as possible" is on.
 	 * @return array|null Resolved target or null.
 	 */
-	private function choose_target( array $candidate, $post, array $source_terms, array $used_urls, array $per_target, $max_frequency, $unlimited ) {
+	private function choose_target( array $candidate, array $source, array $source_terms, array $used_urls, array $per_target, $max_frequency, $unlimited ) {
 		foreach ( $candidate['targets'] as $ref ) {
-			// Never link a post to itself.
-			if ( 'post' === $ref['type'] && (int) $ref['id'] === (int) $post->ID ) {
+			// Never link a source to itself.
+			if ( $ref['type'] === $source['type'] && (int) $ref['id'] === (int) $source['id'] ) {
 				continue;
 			}
 
@@ -719,7 +979,7 @@ class ILB_Engine {
 				continue;
 			}
 
-			if ( ! $this->target_passes_incoming_limit( $ref, $post, $unlimited ) ) {
+			if ( ! $this->target_passes_incoming_limit( $ref, $source, $unlimited ) ) {
 				continue;
 			}
 
@@ -732,16 +992,12 @@ class ILB_Engine {
 	/**
 	 * Whether linking to a target stays within the global incoming-link limit.
 	 *
-	 * The count is read from the link graph, excluding the current source so a
-	 * source already credited with the link can still render it. During graph
-	 * generation the count accumulates as earlier sources are written.
-	 *
-	 * @param array   $ref       Target reference (id, type).
-	 * @param WP_Post $post      Source post.
-	 * @param bool    $unlimited Whether "link as often as possible" is on.
+	 * @param array $ref       Target reference (id, type).
+	 * @param array $source    Source descriptor.
+	 * @param bool  $unlimited Whether "link as often as possible" is on.
 	 * @return bool
 	 */
-	private function target_passes_incoming_limit( array $ref, $post, $unlimited ) {
+	private function target_passes_incoming_limit( array $ref, array $source, $unlimited ) {
 		if ( $unlimited ) {
 			return true;
 		}
@@ -749,7 +1005,7 @@ class ILB_Engine {
 		// The limit applies when enabled globally or on the target itself.
 		$enabled = (bool) $this->settings->get( 'limit_incoming_links' );
 		if ( ! $enabled ) {
-			$overrides = $this->keywords->get_target_settings( $ref['id'], $ref['type'] );
+			$overrides = $this->get_overrides( $ref['id'], $ref['type'] );
 			$enabled   = ! empty( $overrides['limit_incoming_links'] );
 		}
 
@@ -762,9 +1018,25 @@ class ILB_Engine {
 			return true;
 		}
 
-		$current = $this->links->incoming_count( $ref['id'], $ref['type'], (int) $post->ID, 'post' );
+		$current = $this->links->incoming_count( $ref['id'], $ref['type'], (int) $source['id'], $source['type'] );
 
 		return $current < $max;
+	}
+
+	/**
+	 * Returns the per-target override settings, cached per request.
+	 *
+	 * @param int    $id   Object ID.
+	 * @param string $type 'post' or 'term'.
+	 * @return array<string,int>
+	 */
+	private function get_overrides( $id, $type ) {
+		$key = $type . ':' . $id;
+		if ( ! isset( $this->override_cache[ $key ] ) ) {
+			$this->override_cache[ $key ] = $this->keywords->get_target_settings( $id, $type );
+		}
+
+		return $this->override_cache[ $key ];
 	}
 
 	/**
@@ -829,17 +1101,23 @@ class ILB_Engine {
 	}
 
 	/**
-	 * Returns the source post's terms grouped by limiting taxonomy.
+	 * Returns the source's terms grouped by limiting taxonomy.
 	 *
-	 * @param WP_Post $post Source post.
+	 * Only post sources participate in taxonomy limiting.
+	 *
+	 * @param array $source Source descriptor.
 	 * @return array<string,int[]>
 	 */
-	private function source_terms( $post ) {
+	private function source_terms( array $source ) {
+		if ( 'post' !== $source['type'] ) {
+			return array();
+		}
+
 		$taxonomies = (array) $this->settings->get( 'limiting_taxonomies' );
 		$terms      = array();
 
 		foreach ( $taxonomies as $taxonomy ) {
-			$ids = wp_get_object_terms( $post->ID, $taxonomy, array( 'fields' => 'ids' ) );
+			$ids                = wp_get_object_terms( $source['id'], $taxonomy, array( 'fields' => 'ids' ) );
 			$terms[ $taxonomy ] = is_wp_error( $ids ) ? array() : array_map( 'intval', $ids );
 		}
 

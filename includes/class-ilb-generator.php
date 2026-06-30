@@ -70,7 +70,7 @@ class ILB_Generator {
 	 */
 	public function hooks() {
 		add_action( self::HOOK_KICKOFF, array( $this, 'run_kickoff' ) );
-		add_action( self::HOOK_BATCH, array( $this, 'run_batch' ), 10, 1 );
+		add_action( self::HOOK_BATCH, array( $this, 'run_batch' ), 10, 2 );
 
 		// Automatic mode: any change that affects the index schedules a rebuild.
 		if ( 'automatic' === $this->settings->get( 'index_generation_mode' ) ) {
@@ -136,26 +136,55 @@ class ILB_Generator {
 	 */
 	public function run_kickoff() {
 		$this->links->clear_all();
-		$this->schedule_batch( 0 );
+		$this->schedule_batch( 'post', 0 );
 	}
 
 	/**
-	 * Processes one batch of source posts.
+	 * Processes one batch of sources.
 	 *
-	 * @param int $offset Offset into the ordered source list.
+	 * Posts are processed first (phase "post"), then term descriptions (phase
+	 * "term"). Sources within a phase are processed in a fixed order so
+	 * incoming-link counts accumulate deterministically.
+	 *
+	 * @param string $phase  Source phase: 'post' or 'term'.
+	 * @param int    $offset Offset into the ordered source list.
 	 */
-	public function run_batch( $offset = 0 ) {
+	public function run_batch( $phase = 'post', $offset = 0 ) {
+		$phase      = ( 'term' === $phase ) ? 'term' : 'post';
 		$offset     = max( 0, (int) $offset );
 		$batch_size = $this->batch_size();
 
-		$post_ids = $this->source_ids( $offset, $batch_size );
-		if ( empty( $post_ids ) ) {
-			/**
-			 * Fires when a full link-graph regeneration has completed.
-			 */
-			do_action( 'ilb_generation_complete' );
+		$processed = ( 'term' === $phase )
+			? $this->process_term_batch( $offset, $batch_size )
+			: $this->process_post_batch( $offset, $batch_size );
+
+		if ( $processed === $batch_size ) {
+			// This phase has more work.
+			$this->schedule_batch( $phase, $offset + $batch_size );
 			return;
 		}
+
+		if ( 'post' === $phase ) {
+			// Posts done; start the term phase.
+			$this->schedule_batch( 'term', 0 );
+			return;
+		}
+
+		/**
+		 * Fires when a full link-graph regeneration has completed.
+		 */
+		do_action( 'ilb_generation_complete' );
+	}
+
+	/**
+	 * Processes a batch of post sources.
+	 *
+	 * @param int $offset Offset.
+	 * @param int $limit  Batch size.
+	 * @return int Number of sources processed.
+	 */
+	private function process_post_batch( $offset, $limit ) {
+		$post_ids = $this->source_ids( $offset, $limit );
 
 		foreach ( $post_ids as $post_id ) {
 			$post = get_post( $post_id );
@@ -167,12 +196,30 @@ class ILB_Generator {
 			$this->links->replace_for_source( $post->ID, 'post', $links );
 		}
 
-		// Chain the next batch only if this one was full.
-		if ( count( $post_ids ) === $batch_size ) {
-			$this->schedule_batch( $offset + $batch_size );
-		} else {
-			do_action( 'ilb_generation_complete' );
+		return count( $post_ids );
+	}
+
+	/**
+	 * Processes a batch of term sources (their descriptions).
+	 *
+	 * @param int $offset Offset.
+	 * @param int $limit  Batch size.
+	 * @return int Number of sources processed.
+	 */
+	private function process_term_batch( $offset, $limit ) {
+		$term_ids = $this->term_source_ids( $offset, $limit );
+
+		foreach ( $term_ids as $term_id ) {
+			$term = get_term( $term_id );
+			if ( ! $term instanceof WP_Term ) {
+				continue;
+			}
+
+			$links = $this->engine->compute_links_for_term( $term );
+			$this->links->replace_for_source( $term->term_id, 'term', $links );
 		}
+
+		return count( $term_ids );
 	}
 
 	/**
@@ -217,17 +264,47 @@ class ILB_Generator {
 	}
 
 	/**
+	 * Returns a page of whitelisted term source IDs (terms with a description),
+	 * ordered by term ID.
+	 *
+	 * @param int $offset Offset.
+	 * @param int $limit  Page size.
+	 * @return int[]
+	 */
+	private function term_source_ids( $offset, $limit ) {
+		$taxonomies = (array) $this->settings->get( 'whitelist_taxonomies' );
+		if ( empty( $taxonomies ) ) {
+			return array();
+		}
+
+		$terms = get_terms(
+			array(
+				'taxonomy'   => $taxonomies,
+				'hide_empty' => false,
+				'fields'     => 'ids',
+				'orderby'    => 'term_id',
+				'order'      => 'ASC',
+				'number'     => $limit,
+				'offset'     => $offset,
+			)
+		);
+
+		return is_wp_error( $terms ) ? array() : array_map( 'intval', $terms );
+	}
+
+	/**
 	 * Schedules a single batch action.
 	 *
-	 * @param int $offset Offset for the batch.
+	 * @param string $phase  Source phase ('post' or 'term').
+	 * @param int    $offset Offset for the batch.
 	 */
-	private function schedule_batch( $offset ) {
+	private function schedule_batch( $phase, $offset ) {
 		if ( function_exists( 'as_enqueue_async_action' ) ) {
-			as_enqueue_async_action( self::HOOK_BATCH, array( $offset ), self::GROUP );
+			as_enqueue_async_action( self::HOOK_BATCH, array( $phase, $offset ), self::GROUP );
 			return;
 		}
 
-		wp_schedule_single_event( time() + 1, self::HOOK_BATCH, array( $offset ) );
+		wp_schedule_single_event( time() + 1, self::HOOK_BATCH, array( $phase, $offset ) );
 	}
 
 	/**

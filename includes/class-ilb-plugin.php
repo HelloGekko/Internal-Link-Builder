@@ -71,6 +71,13 @@ final class ILB_Plugin {
 	public $metabox = null;
 
 	/**
+	 * Term fields handler.
+	 *
+	 * @var ILB_Term_Fields|null
+	 */
+	public $term_fields = null;
+
+	/**
 	 * Front-end linking engine.
 	 *
 	 * @var ILB_Engine
@@ -131,6 +138,7 @@ final class ILB_Plugin {
 		if ( is_admin() ) {
 			require_once ILB_PLUGIN_DIR . 'includes/class-ilb-admin.php';
 			require_once ILB_PLUGIN_DIR . 'includes/class-ilb-metabox.php';
+			require_once ILB_PLUGIN_DIR . 'includes/class-ilb-term-fields.php';
 		}
 	}
 
@@ -152,8 +160,9 @@ final class ILB_Plugin {
 		$this->actions   = new ILB_Actions( $this->settings );
 
 		if ( is_admin() ) {
-			$this->admin   = new ILB_Admin( $this->settings );
-			$this->metabox = new ILB_Metabox( $this->settings, $this->keywords );
+			$this->admin       = new ILB_Admin( $this->settings );
+			$this->metabox     = new ILB_Metabox( $this->settings, $this->keywords );
+			$this->term_fields = new ILB_Term_Fields( $this->settings, $this->keywords );
 		}
 	}
 
