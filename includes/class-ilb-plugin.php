@@ -71,6 +71,13 @@ final class ILB_Plugin {
 	public $metabox = null;
 
 	/**
+	 * Front-end linking engine.
+	 *
+	 * @var ILB_Engine
+	 */
+	public $engine;
+
+	/**
 	 * Retrieves the singleton instance.
 	 *
 	 * @return ILB_Plugin
@@ -101,6 +108,7 @@ final class ILB_Plugin {
 		require_once ILB_PLUGIN_DIR . 'includes/class-ilb-settings.php';
 		require_once ILB_PLUGIN_DIR . 'includes/class-ilb-index.php';
 		require_once ILB_PLUGIN_DIR . 'includes/class-ilb-keywords.php';
+		require_once ILB_PLUGIN_DIR . 'includes/class-ilb-engine.php';
 		require_once ILB_PLUGIN_DIR . 'includes/class-ilb-admin-bar.php';
 		require_once ILB_PLUGIN_DIR . 'includes/class-ilb-actions.php';
 
@@ -119,6 +127,7 @@ final class ILB_Plugin {
 
 		$this->index    = new ILB_Index();
 		$this->keywords = new ILB_Keywords( $this->settings, $this->index );
+		$this->engine   = new ILB_Engine( $this->settings, $this->index, $this->keywords );
 
 		$this->admin_bar = new ILB_Admin_Bar( $this->settings );
 		$this->actions   = new ILB_Actions( $this->settings );

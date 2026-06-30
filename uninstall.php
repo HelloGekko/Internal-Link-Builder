@@ -22,11 +22,13 @@ if ( is_array( $ilb_settings ) && ! empty( $ilb_settings['keep_data_on_uninstall
 // Remove the settings option and the schema version marker.
 delete_option( $ilb_option_key );
 delete_option( 'ilb_db_version' );
+delete_option( 'ilb_index_token' );
 
-// Remove per-post keyword configuration.
+// Remove per-post keyword configuration and cached link output.
 delete_post_meta_by_key( '_ilb_keywords' );
 delete_post_meta_by_key( '_ilb_settings' );
 delete_post_meta_by_key( '_ilb_content_blacklist' );
+delete_post_meta_by_key( '_ilb_link_cache' );
 
 // Remove per-term keyword configuration.
 $ilb_term_meta_keys = array( '_ilb_keywords', '_ilb_settings', '_ilb_content_blacklist' );

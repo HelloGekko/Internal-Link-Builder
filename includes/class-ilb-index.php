@@ -28,6 +28,29 @@ class ILB_Index {
 	const DB_VERSION_OPTION = 'ilb_db_version';
 
 	/**
+	 * Option key holding a token that changes whenever the index changes. The
+	 * front-end cache is keyed partly on this token, so any index update
+	 * transparently invalidates cached link output.
+	 */
+	const TOKEN_OPTION = 'ilb_index_token';
+
+	/**
+	 * Returns the current index token.
+	 *
+	 * @return int
+	 */
+	public static function token() {
+		return (int) get_option( self::TOKEN_OPTION, 0 );
+	}
+
+	/**
+	 * Bumps the index token, invalidating front-end caches.
+	 */
+	public static function bump_token() {
+		update_option( self::TOKEN_OPTION, self::token() + 1 );
+	}
+
+	/**
 	 * Returns the fully-qualified index table name.
 	 *
 	 * @return string
@@ -120,6 +143,8 @@ class ILB_Index {
 				array( '%s', '%s', '%d', '%s' )
 			);
 		}
+
+		self::bump_token();
 	}
 
 	/**
@@ -140,6 +165,8 @@ class ILB_Index {
 			),
 			array( '%d', '%s' )
 		);
+
+		self::bump_token();
 	}
 
 	/**
@@ -162,6 +189,22 @@ class ILB_Index {
 				"SELECT keyword, target_id, target_type FROM {$table} WHERE keyword_lower = %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 				$lower
 			),
+			ARRAY_A
+		);
+	}
+
+	/**
+	 * Returns every index row, ordered by insertion (configuration) order.
+	 *
+	 * @return array[] List of rows (keyword, keyword_lower, target_id, target_type).
+	 */
+	public function all_rows() {
+		global $wpdb;
+
+		$table = self::table_name();
+
+		return $wpdb->get_results(
+			"SELECT keyword, keyword_lower, target_id, target_type FROM {$table} ORDER BY id ASC", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 			ARRAY_A
 		);
 	}
