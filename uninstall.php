@@ -23,6 +23,7 @@ if ( is_array( $ilb_settings ) && ! empty( $ilb_settings['keep_data_on_uninstall
 delete_option( $ilb_option_key );
 delete_option( 'ilb_db_version' );
 delete_option( 'ilb_index_token' );
+delete_option( 'ilb_generation_status' );
 
 // Remove per-post keyword configuration and cached link output.
 delete_post_meta_by_key( '_ilb_keywords' );

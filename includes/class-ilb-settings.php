@@ -353,6 +353,30 @@ class ILB_Settings {
 		return $flat;
 	}
 
+	/**
+	 * Returns the fields belonging to a single settings tab.
+	 *
+	 * Falls back to every field when the tab is unknown, preserving the
+	 * previous full-overwrite behaviour as a safe default.
+	 *
+	 * @param string $tab Tab slug.
+	 * @return array<string,array>
+	 */
+	public function fields_for_tab( $tab ) {
+		switch ( $tab ) {
+			case 'general':
+				return $this->general_fields();
+			case 'content':
+				return $this->content_fields();
+			case 'links':
+				return $this->links_fields();
+			case 'actions':
+				return $this->action_fields();
+			default:
+				return $this->all_fields();
+		}
+	}
+
 	/*
 	 * -------------------------------------------------------------------------
 	 * Option access
@@ -434,9 +458,17 @@ class ILB_Settings {
 	 * @return array
 	 */
 	public function sanitize( $input ) {
-		$input  = is_array( $input ) ? $input : array();
-		$fields = $this->all_fields();
-		$clean  = array();
+		$input = is_array( $input ) ? $input : array();
+
+		// Each settings tab is its own form but all settings live in a single
+		// option. Start from the existing stored values so saving one tab never
+		// wipes the others, then overlay only the fields of the submitted tab.
+		$existing = get_option( ILB_SETTINGS_OPTION, array() );
+		$existing = is_array( $existing ) ? $existing : array();
+		$clean    = array_merge( self::defaults(), $existing );
+
+		$tab    = isset( $input['_tab'] ) ? sanitize_key( $input['_tab'] ) : '';
+		$fields = $this->fields_for_tab( $tab );
 
 		foreach ( $fields as $key => $field ) {
 			$type  = isset( $field['type'] ) ? $field['type'] : 'text';

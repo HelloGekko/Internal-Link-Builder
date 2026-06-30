@@ -110,5 +110,154 @@
 			e.preventDefault();
 			runAction( $( this ) );
 		} );
+
+		initIndexStatus();
 	} );
+
+	/* ---------------------------------------------------------------------- *
+	 * Index status & browser-driven generation.
+	 * ---------------------------------------------------------------------- */
+
+	var statusPoll = null;
+
+	/**
+	 * Updates the status counts and progress bar.
+	 *
+	 * @param {Object} data Status payload.
+	 */
+	function renderStatus( data ) {
+		var $root = $( '.ilb-index-status' );
+		if ( ! $root.length || ! data ) {
+			return;
+		}
+
+		$root.find( '.ilb-stat-keywords' ).text( data.keywords );
+		$root.find( '.ilb-stat-links' ).text( data.links );
+
+		var total = parseInt( data.total, 10 ) || 0;
+		var processed = parseInt( data.processed, 10 ) || 0;
+
+		if ( data.running ) {
+			$root.find( '.ilb-stat-state' ).text( i18n.running || 'Generating…' );
+			showProgress( processed, total );
+		} else {
+			$root.find( '.ilb-stat-state' ).text( i18n.idle || 'Idle' );
+		}
+	}
+
+	/**
+	 * Shows and updates the progress bar.
+	 *
+	 * @param {number} processed Processed count.
+	 * @param {number} total     Total count.
+	 */
+	function showProgress( processed, total ) {
+		var $progress = $( '.ilb-progress' );
+		var pct = total > 0 ? Math.min( 100, Math.round( ( processed / total ) * 100 ) ) : 0;
+
+		$progress.prop( 'hidden', false );
+		$progress.find( '.ilb-progress-fill' ).css( 'width', pct + '%' );
+		$progress.find( '.ilb-progress-label' ).text(
+			( i18n.progress || '%1$d / %2$d' ).replace( '%1$d', processed ).replace( '%2$d', total )
+			+ '  (' + pct + '%)'
+		);
+	}
+
+	/**
+	 * Fetches the current status once.
+	 *
+	 * @param {Function} [cb] Optional callback with the data.
+	 */
+	function fetchStatus( cb ) {
+		$.post( settings.ajaxUrl, {
+			action: 'ilb_index_status',
+			nonce: settings.nonce
+		} ).done( function ( response ) {
+			if ( response && response.success ) {
+				renderStatus( response.data );
+				if ( cb ) {
+					cb( response.data );
+				}
+			}
+		} );
+	}
+
+	/**
+	 * Runs one generation step and chains to the next until done.
+	 *
+	 * @param {Object} state  Current {phase, offset} (null to begin).
+	 * @param {jQuery} $button The generate button.
+	 */
+	function generationStep( state, $button ) {
+		var payload = {
+			action: 'ilb_run_generation',
+			nonce: settings.nonce,
+			step: state ? 'continue' : 'begin'
+		};
+		if ( state ) {
+			payload.phase = state.phase;
+			payload.offset = state.offset;
+		}
+
+		$.post( settings.ajaxUrl, payload ).done( function ( response ) {
+			if ( ! response || ! response.success ) {
+				finishGeneration( $button );
+				return;
+			}
+			var data = response.data;
+			showProgress( data.processed, data.total );
+			$( '.ilb-index-status .ilb-stat-state' ).text( i18n.running || 'Generating…' );
+
+			if ( data.done ) {
+				finishGeneration( $button );
+				return;
+			}
+			generationStep( { phase: data.phase, offset: data.offset }, $button );
+		} ).fail( function () {
+			finishGeneration( $button );
+		} );
+	}
+
+	/**
+	 * Restores the UI after a generation run.
+	 *
+	 * @param {jQuery} $button The generate button.
+	 */
+	function finishGeneration( $button ) {
+		$button.prop( 'disabled', false );
+		$( '.ilb-index-status .ilb-stat-state' ).text( i18n.complete || 'Done' );
+		fetchStatus();
+	}
+
+	/**
+	 * Wires up the status panel on the Actions tab.
+	 */
+	function initIndexStatus() {
+		var $root = $( '.ilb-index-status' );
+		if ( ! $root.length ) {
+			return;
+		}
+
+		fetchStatus();
+
+		// Poll while a background generation is running.
+		if ( '1' === String( $root.data( 'running' ) ) ) {
+			statusPoll = window.setInterval( function () {
+				fetchStatus( function ( data ) {
+					if ( ! data.running && statusPoll ) {
+						window.clearInterval( statusPoll );
+						statusPoll = null;
+					}
+				} );
+			}, 3000 );
+		}
+
+		$root.on( 'click', '.ilb-generate-button', function ( e ) {
+			e.preventDefault();
+			var $button = $( this );
+			$button.prop( 'disabled', true );
+			$( '.ilb-progress' ).prop( 'hidden', false );
+			generationStep( null, $button );
+		} );
+	}
 } )( jQuery );

@@ -32,6 +32,16 @@ class ILB_Generator {
 	const GROUP = 'internal-link-builder';
 
 	/**
+	 * Option storing the current generation progress.
+	 */
+	const STATUS_OPTION = 'ilb_generation_status';
+
+	/**
+	 * Number of sources processed per foreground (browser-driven) step.
+	 */
+	const FOREGROUND_CHUNK = 20;
+
+	/**
 	 * Settings handler.
 	 *
 	 * @var ILB_Settings
@@ -71,6 +81,9 @@ class ILB_Generator {
 	public function hooks() {
 		add_action( self::HOOK_KICKOFF, array( $this, 'run_kickoff' ) );
 		add_action( self::HOOK_BATCH, array( $this, 'run_batch' ), 10, 2 );
+
+		add_action( 'wp_ajax_ilb_run_generation', array( $this, 'ajax_run_generation' ) );
+		add_action( 'wp_ajax_ilb_index_status', array( $this, 'ajax_index_status' ) );
 
 		// Automatic mode: any change that affects the index schedules a rebuild.
 		if ( 'automatic' === $this->settings->get( 'index_generation_mode' ) ) {
@@ -136,6 +149,14 @@ class ILB_Generator {
 	 */
 	public function run_kickoff() {
 		$this->links->clear_all();
+		$this->set_status(
+			array(
+				'running'   => 1,
+				'processed' => 0,
+				'total'     => $this->source_total(),
+				'updated'   => time(),
+			)
+		);
 		$this->schedule_batch( 'post', 0 );
 	}
 
@@ -158,6 +179,9 @@ class ILB_Generator {
 			? $this->process_term_batch( $offset, $batch_size )
 			: $this->process_post_batch( $offset, $batch_size );
 
+		$base = ( 'term' === $phase ) ? $this->count_posts() : 0;
+		$this->update_progress( $base + $offset + $processed );
+
 		if ( $processed === $batch_size ) {
 			// This phase has more work.
 			$this->schedule_batch( $phase, $offset + $batch_size );
@@ -169,6 +193,8 @@ class ILB_Generator {
 			$this->schedule_batch( 'term', 0 );
 			return;
 		}
+
+		$this->finish_status();
 
 		/**
 		 * Fires when a full link-graph regeneration has completed.
@@ -290,6 +316,222 @@ class ILB_Generator {
 		);
 
 		return is_wp_error( $terms ) ? array() : array_map( 'intval', $terms );
+	}
+
+	/*
+	 * -------------------------------------------------------------------------
+	 * Foreground (browser-driven) generation + progress
+	 * -------------------------------------------------------------------------
+	 */
+
+	/**
+	 * AJAX: drives a browser-driven generation, one chunk per request.
+	 *
+	 * Expects a "step" of 'begin' (clear + count) or 'continue' (process the
+	 * given phase/offset). Returns the next phase/offset and progress so the
+	 * admin JS can render a progress bar without relying on cron timing.
+	 */
+	public function ajax_run_generation() {
+		$this->guard_ajax();
+
+		$step = isset( $_POST['step'] ) ? sanitize_key( wp_unslash( $_POST['step'] ) ) : 'begin';
+
+		// Background scheduling is redundant while running in the foreground.
+		self::cancel_all();
+
+		if ( 'begin' === $step ) {
+			$this->links->clear_all();
+			$total = $this->source_total();
+			$this->set_status(
+				array(
+					'running'   => 1,
+					'processed' => 0,
+					'total'     => $total,
+					'updated'   => time(),
+				)
+			);
+
+			wp_send_json_success(
+				array(
+					'phase'     => 'post',
+					'offset'    => 0,
+					'processed' => 0,
+					'total'     => $total,
+					'done'      => false,
+				)
+			);
+		}
+
+		$phase  = ( isset( $_POST['phase'] ) && 'term' === $_POST['phase'] ) ? 'term' : 'post';
+		$offset = isset( $_POST['offset'] ) ? max( 0, (int) $_POST['offset'] ) : 0;
+		$chunk  = self::FOREGROUND_CHUNK;
+
+		$processed = ( 'term' === $phase )
+			? $this->process_term_batch( $offset, $chunk )
+			: $this->process_post_batch( $offset, $chunk );
+
+		$base       = ( 'term' === $phase ) ? $this->count_posts() : 0;
+		$cumulative = $base + $offset + $processed;
+		$this->update_progress( $cumulative );
+
+		$next_phase  = $phase;
+		$next_offset = $offset + $chunk;
+		$done        = false;
+
+		if ( $processed < $chunk ) {
+			if ( 'post' === $phase ) {
+				$next_phase  = 'term';
+				$next_offset = 0;
+			} else {
+				$done = true;
+			}
+		}
+
+		$status = $this->status();
+
+		if ( $done ) {
+			$this->finish_status();
+			do_action( 'ilb_generation_complete' );
+		}
+
+		wp_send_json_success(
+			array(
+				'phase'     => $next_phase,
+				'offset'    => $next_offset,
+				'processed' => $status['processed'],
+				'total'     => $status['total'],
+				'done'      => $done,
+			)
+		);
+	}
+
+	/**
+	 * AJAX: returns the current index status for polling.
+	 */
+	public function ajax_index_status() {
+		$this->guard_ajax();
+		wp_send_json_success( $this->status() );
+	}
+
+	/**
+	 * Verifies an admin AJAX request, dying on failure.
+	 */
+	private function guard_ajax() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array(), 403 );
+		}
+		check_ajax_referer( ILB_Actions::NONCE_ACTION, 'nonce' );
+	}
+
+	/**
+	 * Returns the current index status (counts, progress and run state).
+	 *
+	 * @return array
+	 */
+	public function status() {
+		$status = get_option( self::STATUS_OPTION, array() );
+		$status = is_array( $status ) ? $status : array();
+
+		$index = new ILB_Index();
+
+		return array(
+			'running'   => ! empty( $status['running'] ),
+			'processed' => isset( $status['processed'] ) ? (int) $status['processed'] : 0,
+			'total'     => isset( $status['total'] ) ? (int) $status['total'] : 0,
+			'keywords'  => $index->count(),
+			'links'     => $this->links->count(),
+		);
+	}
+
+	/**
+	 * Total number of sources (whitelisted posts + terms).
+	 *
+	 * @return int
+	 */
+	public function source_total() {
+		return $this->count_posts() + $this->count_terms();
+	}
+
+	/**
+	 * Counts whitelisted, published source posts.
+	 *
+	 * @return int
+	 */
+	private function count_posts() {
+		$post_types = (array) $this->settings->get( 'whitelist_post_types' );
+		if ( empty( $post_types ) ) {
+			return 0;
+		}
+
+		$query = new WP_Query(
+			array(
+				'post_type'              => $post_types,
+				'post_status'            => 'publish',
+				'fields'                 => 'ids',
+				'posts_per_page'         => 1,
+				'update_post_meta_cache' => false,
+				'update_post_term_cache' => false,
+				'suppress_filters'       => true,
+			)
+		);
+
+		return (int) $query->found_posts;
+	}
+
+	/**
+	 * Counts whitelisted term sources.
+	 *
+	 * @return int
+	 */
+	private function count_terms() {
+		$taxonomies = (array) $this->settings->get( 'whitelist_taxonomies' );
+		if ( empty( $taxonomies ) ) {
+			return 0;
+		}
+
+		$count = get_terms(
+			array(
+				'taxonomy'   => $taxonomies,
+				'hide_empty' => false,
+				'fields'     => 'count',
+			)
+		);
+
+		return is_wp_error( $count ) ? 0 : (int) $count;
+	}
+
+	/**
+	 * Stores the generation status.
+	 *
+	 * @param array $status Status data.
+	 */
+	private function set_status( array $status ) {
+		update_option( self::STATUS_OPTION, $status, false );
+	}
+
+	/**
+	 * Updates the processed counter in the status option.
+	 *
+	 * @param int $processed Cumulative processed count.
+	 */
+	private function update_progress( $processed ) {
+		$status              = get_option( self::STATUS_OPTION, array() );
+		$status              = is_array( $status ) ? $status : array();
+		$status['processed'] = (int) $processed;
+		$status['updated']   = time();
+		update_option( self::STATUS_OPTION, $status, false );
+	}
+
+	/**
+	 * Marks the generation as finished.
+	 */
+	private function finish_status() {
+		$status              = get_option( self::STATUS_OPTION, array() );
+		$status              = is_array( $status ) ? $status : array();
+		$status['running']   = 0;
+		$status['processed'] = isset( $status['total'] ) ? (int) $status['total'] : ( isset( $status['processed'] ) ? (int) $status['processed'] : 0 );
+		$status['updated']   = time();
+		update_option( self::STATUS_OPTION, $status, false );
 	}
 
 	/**

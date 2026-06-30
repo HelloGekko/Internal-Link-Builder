@@ -4,7 +4,7 @@ Tags: internal links, seo, automatic linking, interlinking, keywords
 Requires at least: 5.8
 Tested up to: 6.5
 Requires PHP: 7.4
-Stable tag: 0.6.0
+Stable tag: 0.7.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -43,6 +43,13 @@ keyword configuration and the front-end linking engine.
    limits. The original content in the database is never changed.
 
 == Changelog ==
+
+= 0.7.0 =
+* Fix: saving one settings tab no longer wipes the others. Settings are now
+  merged per tab, so token/array fields on other tabs keep their values.
+* Add an "Index status" panel on the Actions tab with live keyword/link counts
+  and a "Generate / rebuild index now" button that runs in the browser with a
+  progress bar (works regardless of Action Scheduler or cron availability).
 
 = 0.6.0 =
 * Replace the post-type, taxonomy, post and term selection fields with a

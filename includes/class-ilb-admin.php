@@ -139,6 +139,17 @@ class ILB_Admin {
 	}
 
 	/**
+	 * Whether a link-graph generation is currently in progress.
+	 *
+	 * @return bool
+	 */
+	private function is_generation_running() {
+		$status = get_option( ILB_Generator::STATUS_OPTION, array() );
+
+		return is_array( $status ) && ! empty( $status['running'] );
+	}
+
+	/**
 	 * Registers the admin menu entry.
 	 */
 	public function register_menu() {
@@ -211,6 +222,11 @@ class ILB_Admin {
 					'working'       => __( 'Working…', 'internal-link-builder' ),
 					'remove'        => __( 'Remove', 'internal-link-builder' ),
 					'addLine'       => __( 'Add line', 'internal-link-builder' ),
+					'idle'          => __( 'Idle', 'internal-link-builder' ),
+					'running'       => __( 'Generating…', 'internal-link-builder' ),
+					'complete'      => __( 'Index up to date.', 'internal-link-builder' ),
+					/* translators: 1: processed count, 2: total count. */
+					'progress'      => __( '%1$d / %2$d sources processed', 'internal-link-builder' ),
 				),
 			)
 		);
@@ -273,6 +289,11 @@ class ILB_Admin {
 				<form method="post" action="options.php" class="ilb-form">
 					<?php
 					settings_fields( ILB_Settings::OPTION_GROUP );
+					printf(
+						'<input type="hidden" name="%s[_tab]" value="%s" />',
+						esc_attr( ILB_SETTINGS_OPTION ),
+						esc_attr( $current_tab )
+					);
 					$this->render_fields_tab( $current_tab );
 					submit_button();
 					?>
@@ -678,12 +699,45 @@ class ILB_Admin {
 		$cache_value = $this->settings->get( 'cache' );
 		?>
 		<form method="post" action="options.php" class="ilb-form">
-			<?php settings_fields( ILB_Settings::OPTION_GROUP ); ?>
+			<?php
+			settings_fields( ILB_Settings::OPTION_GROUP );
+			printf(
+				'<input type="hidden" name="%s[_tab]" value="actions" />',
+				esc_attr( ILB_SETTINGS_OPTION )
+			);
+			?>
 			<table class="form-table ilb-form-table" role="presentation"><tbody>
 				<?php $this->render_field_row( 'cache', $cache_field, array( 'cache' => $cache_value ) ); ?>
 			</tbody></table>
 			<?php submit_button(); ?>
 		</form>
+
+		<hr />
+
+		<h2><?php esc_html_e( 'Index status', 'internal-link-builder' ); ?></h2>
+		<div class="ilb-index-status" data-running="<?php echo esc_attr( $this->is_generation_running() ? '1' : '0' ); ?>">
+			<p class="ilb-index-counts">
+				<?php esc_html_e( 'Indexed keywords:', 'internal-link-builder' ); ?>
+				<strong class="ilb-stat-keywords">…</strong>
+				&nbsp;·&nbsp;
+				<?php esc_html_e( 'Generated links:', 'internal-link-builder' ); ?>
+				<strong class="ilb-stat-links">…</strong>
+				&nbsp;·&nbsp;
+				<span class="ilb-stat-state"></span>
+			</p>
+
+			<div class="ilb-progress" hidden>
+				<div class="ilb-progress-bar"><span class="ilb-progress-fill"></span></div>
+				<p class="ilb-progress-label" aria-live="polite"></p>
+			</div>
+
+			<p>
+				<button type="button" class="button button-primary ilb-generate-button">
+					<?php esc_html_e( 'Generate / rebuild index now', 'internal-link-builder' ); ?>
+				</button>
+				<span class="description"><?php esc_html_e( 'Rebuilds the whole link graph in your browser. You can leave the page once it finishes.', 'internal-link-builder' ); ?></span>
+			</p>
+		</div>
 
 		<hr />
 
