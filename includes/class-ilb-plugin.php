@@ -50,6 +50,27 @@ final class ILB_Plugin {
 	public $actions;
 
 	/**
+	 * Keyword index handler.
+	 *
+	 * @var ILB_Index
+	 */
+	public $index;
+
+	/**
+	 * Keyword storage handler.
+	 *
+	 * @var ILB_Keywords
+	 */
+	public $keywords;
+
+	/**
+	 * Post metabox handler.
+	 *
+	 * @var ILB_Metabox|null
+	 */
+	public $metabox = null;
+
+	/**
 	 * Retrieves the singleton instance.
 	 *
 	 * @return ILB_Plugin
@@ -78,11 +99,14 @@ final class ILB_Plugin {
 	 */
 	private function includes() {
 		require_once ILB_PLUGIN_DIR . 'includes/class-ilb-settings.php';
+		require_once ILB_PLUGIN_DIR . 'includes/class-ilb-index.php';
+		require_once ILB_PLUGIN_DIR . 'includes/class-ilb-keywords.php';
 		require_once ILB_PLUGIN_DIR . 'includes/class-ilb-admin-bar.php';
 		require_once ILB_PLUGIN_DIR . 'includes/class-ilb-actions.php';
 
 		if ( is_admin() ) {
 			require_once ILB_PLUGIN_DIR . 'includes/class-ilb-admin.php';
+			require_once ILB_PLUGIN_DIR . 'includes/class-ilb-metabox.php';
 		}
 	}
 
@@ -93,11 +117,15 @@ final class ILB_Plugin {
 		$this->settings = new ILB_Settings();
 		$this->settings->hooks();
 
+		$this->index    = new ILB_Index();
+		$this->keywords = new ILB_Keywords( $this->settings, $this->index );
+
 		$this->admin_bar = new ILB_Admin_Bar( $this->settings );
 		$this->actions   = new ILB_Actions( $this->settings );
 
 		if ( is_admin() ) {
-			$this->admin = new ILB_Admin( $this->settings );
+			$this->admin   = new ILB_Admin( $this->settings );
+			$this->metabox = new ILB_Metabox( $this->settings, $this->keywords );
 		}
 	}
 
@@ -116,6 +144,8 @@ final class ILB_Plugin {
 		if ( false === get_option( ILB_SETTINGS_OPTION, false ) ) {
 			add_option( ILB_SETTINGS_OPTION, ILB_Settings::defaults() );
 		}
+
+		ILB_Index::install();
 	}
 
 	/**

@@ -19,14 +19,32 @@ if ( is_array( $ilb_settings ) && ! empty( $ilb_settings['keep_data_on_uninstall
 	return;
 }
 
-// Remove the settings option.
+// Remove the settings option and the schema version marker.
 delete_option( $ilb_option_key );
+delete_option( 'ilb_db_version' );
 
-// Remove any per-post / per-term keyword configuration the engine will store
-// under these meta keys (safe to run even before the engine exists).
+// Remove per-post keyword configuration.
 delete_post_meta_by_key( '_ilb_keywords' );
 delete_post_meta_by_key( '_ilb_settings' );
-delete_post_meta_by_key( '_ilb_keyword_blacklist' );
+delete_post_meta_by_key( '_ilb_content_blacklist' );
+
+// Remove per-term keyword configuration.
+$ilb_term_meta_keys = array( '_ilb_keywords', '_ilb_settings', '_ilb_content_blacklist' );
+foreach ( $ilb_term_meta_keys as $ilb_meta_key ) {
+	$ilb_term_ids = $GLOBALS['wpdb']->get_col(
+		$GLOBALS['wpdb']->prepare(
+			"SELECT term_id FROM {$GLOBALS['wpdb']->termmeta} WHERE meta_key = %s",
+			$ilb_meta_key
+		)
+	);
+	foreach ( $ilb_term_ids as $ilb_term_id ) {
+		delete_term_meta( (int) $ilb_term_id, $ilb_meta_key );
+	}
+}
+
+// Drop the keyword index table.
+$ilb_index_table = $GLOBALS['wpdb']->prefix . 'ilb_index';
+$GLOBALS['wpdb']->query( "DROP TABLE IF EXISTS {$ilb_index_table}" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 
 // Clean up scheduled actions if Action Scheduler is present.
 if ( function_exists( 'as_unschedule_all_actions' ) ) {

@@ -1,0 +1,135 @@
+/* Internal Link Builder - post metabox styles. */
+
+.ilb-mb-tabs {
+	display: flex;
+	gap: 4px;
+	margin: 0 0 12px;
+	border-bottom: 1px solid #dcdcde;
+	padding: 0;
+}
+
+.ilb-mb-tabs li {
+	margin: 0;
+}
+
+.ilb-mb-tab {
+	display: inline-block;
+	padding: 8px 14px;
+	text-decoration: none;
+	color: #50575e;
+	border: 1px solid transparent;
+	border-bottom: none;
+}
+
+.ilb-mb-tab.is-active {
+	color: #1d2327;
+	font-weight: 600;
+	background: #fff;
+	border-color: #dcdcde;
+	border-radius: 3px 3px 0 0;
+	margin-bottom: -1px;
+}
+
+.ilb-mb-panel {
+	display: none;
+}
+
+.ilb-mb-panel.is-active {
+	display: block;
+}
+
+.ilb-mb-subheading {
+	margin: 18px 0 4px;
+}
+
+.ilb-mb-overview {
+	background: #f6f7f7;
+	border: 1px solid #dcdcde;
+	border-radius: 3px;
+	padding: 8px 12px;
+	max-width: 480px;
+}
+
+.ilb-mb-overview ul {
+	margin: 0;
+	list-style: disc;
+	padding-left: 20px;
+}
+
+/* Repeatable rows (metabox-scoped). */
+.ilb-metabox .ilb-repeatable-row {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-bottom: 6px;
+}
+
+.ilb-metabox .ilb-repeatable-row input[type="text"] {
+	width: 320px;
+	max-width: 100%;
+}
+
+.ilb-metabox .ilb-repeatable-remove {
+	color: #b32d2e;
+	text-decoration: none;
+	font-size: 18px;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.ilb-metabox .ilb-repeatable-add {
+	margin-top: 4px;
+}
+
+/* Toggle switch (metabox-scoped). */
+.ilb-mb-toggle-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.ilb-metabox .ilb-switch {
+	position: relative;
+	display: inline-block;
+	width: 44px;
+	height: 24px;
+	flex: 0 0 auto;
+}
+
+.ilb-metabox .ilb-switch input[type="checkbox"] {
+	position: absolute;
+	opacity: 0;
+	width: 44px;
+	height: 24px;
+	margin: 0;
+	cursor: pointer;
+	z-index: 2;
+}
+
+.ilb-metabox .ilb-switch-slider {
+	position: absolute;
+	inset: 0;
+	background: #c3c4c7;
+	border-radius: 24px;
+	transition: background 0.15s ease-in-out;
+}
+
+.ilb-metabox .ilb-switch-slider::before {
+	content: "";
+	position: absolute;
+	height: 18px;
+	width: 18px;
+	left: 3px;
+	top: 3px;
+	background: #fff;
+	border-radius: 50%;
+	transition: transform 0.15s ease-in-out;
+}
+
+.ilb-metabox .ilb-switch input[type="checkbox"]:checked + .ilb-switch-slider {
+	background: #2271b1;
+}
+
+.ilb-metabox .ilb-switch input[type="checkbox"]:checked + .ilb-switch-slider::before {
+	transform: translateX(20px);
+}

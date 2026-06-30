@@ -4,7 +4,7 @@ Tags: internal links, seo, automatic linking, interlinking, keywords
 Requires at least: 5.8
 Tested up to: 6.5
 Requires PHP: 7.4
-Stable tag: 0.1.0
+Stable tag: 0.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -17,8 +17,9 @@ want to *receive* internal links. Whenever those keywords appear in the content
 of other posts, the plugin turns them into links to the configured target — on
 the fly, without modifying your stored content.
 
-This release ships the settings screen and plugin scaffold. The linking engine
-and per-post keyword configuration follow in subsequent releases.
+This release ships the settings screen, the keyword index storage and the
+per-post keyword configuration. The front-end linking engine follows in a
+subsequent release.
 
 = Settings overview =
 
@@ -43,6 +44,12 @@ and per-post keyword configuration follow in subsequent releases.
    limits. The original content in the database is never changed.
 
 == Changelog ==
+
+= 0.2.0 =
+* Add the keyword index table (built per target) and per-target keyword storage.
+* Add the post edit-screen metabox with Keywords and Settings tabs, a
+  "keywords not linked in this content" list and a live blacklist overview.
+* Enforce the configured minimum role for editing keywords.
 
 = 0.1.0 =
 * Initial scaffold: plugin bootstrap, settings storage and the full settings
