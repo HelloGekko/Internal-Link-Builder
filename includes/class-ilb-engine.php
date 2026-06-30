@@ -128,6 +128,19 @@ class ILB_Engine {
 	 */
 
 	/**
+	 * Clears the engine's per-request caches.
+	 *
+	 * Production code rarely needs this (caches are per-request), but it keeps
+	 * long-running processes and the test suite isolated.
+	 */
+	public function flush_caches() {
+		$this->base_candidates = null;
+		$this->base_token      = null;
+		$this->target_cache    = array();
+		$this->override_cache  = array();
+	}
+
+	/**
 	 * The `the_content` filter entry point.
 	 *
 	 * @param string $content Post content.
