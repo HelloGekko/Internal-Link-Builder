@@ -44,11 +44,14 @@ foreach ( $ilb_term_meta_keys as $ilb_meta_key ) {
 	}
 }
 
-// Drop the keyword index table.
-$ilb_index_table = $GLOBALS['wpdb']->prefix . 'ilb_index';
-$GLOBALS['wpdb']->query( "DROP TABLE IF EXISTS {$ilb_index_table}" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+// Drop the keyword index and link graph tables.
+foreach ( array( 'ilb_index', 'ilb_links' ) as $ilb_table_suffix ) {
+	$ilb_table = $GLOBALS['wpdb']->prefix . $ilb_table_suffix;
+	$GLOBALS['wpdb']->query( "DROP TABLE IF EXISTS {$ilb_table}" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+}
 
-// Clean up scheduled actions if Action Scheduler is present.
+// Clean up scheduled actions / cron events.
 if ( function_exists( 'as_unschedule_all_actions' ) ) {
 	as_unschedule_all_actions( '', array(), 'internal-link-builder' );
 }
+wp_clear_scheduled_hook( 'ilb_generate_index' );

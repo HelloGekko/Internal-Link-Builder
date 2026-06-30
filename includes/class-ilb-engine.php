@@ -45,6 +45,13 @@ class ILB_Engine {
 	private $keywords;
 
 	/**
+	 * Link graph / statistics handler.
+	 *
+	 * @var ILB_Links
+	 */
+	private $links;
+
+	/**
 	 * Per-request cache of resolved targets, keyed by "type:id".
 	 *
 	 * @var array
@@ -57,11 +64,13 @@ class ILB_Engine {
 	 * @param ILB_Settings $settings Settings handler.
 	 * @param ILB_Index    $index    Index handler.
 	 * @param ILB_Keywords $keywords Keyword storage handler.
+	 * @param ILB_Links    $links    Link graph handler.
 	 */
-	public function __construct( ILB_Settings $settings, ILB_Index $index, ILB_Keywords $keywords ) {
+	public function __construct( ILB_Settings $settings, ILB_Index $index, ILB_Keywords $keywords, ILB_Links $links ) {
 		$this->settings = $settings;
 		$this->index    = $index;
 		$this->keywords = $keywords;
+		$this->links    = $links;
 
 		// Run after wpautop (priority 10) so paragraphs exist as <p> elements.
 		add_filter( 'the_content', array( $this, 'filter_content' ), 20 );
@@ -281,29 +290,82 @@ class ILB_Engine {
 	 */
 
 	/**
-	 * Generates links for the given content.
+	 * Generates linked HTML for the given content.
 	 *
 	 * @param string  $content Post content.
 	 * @param WP_Post $post    Source post.
 	 * @return string
 	 */
 	private function process( $content, $post ) {
+		$resolved = $this->resolve( $content, $post );
+		if ( ! $resolved || empty( $resolved['accepted'] ) ) {
+			return $content;
+		}
+
+		$this->apply_placements( $resolved['dom'], $resolved['accepted'] );
+
+		return $this->inner_html( $resolved['dom'], $resolved['root'] );
+	}
+
+	/**
+	 * Computes the links a source post would generate, without rendering.
+	 *
+	 * Used by the generator to build the link graph. Runs the exact same
+	 * matching and limit pipeline as the front-end render.
+	 *
+	 * @param WP_Post $post Source post.
+	 * @return array[] List of links: each [target_id, target_type, keyword].
+	 */
+	public function compute_links( WP_Post $post ) {
+		if ( ! $this->is_source_allowed( $post ) ) {
+			return array();
+		}
+
+		// Approximate the rendered structure: paragraphs via wpautop, without
+		// executing shortcodes (which may have side effects during generation).
+		$content  = wpautop( $post->post_content );
+		$resolved = $this->resolve( $content, $post );
+		if ( ! $resolved ) {
+			return array();
+		}
+
+		$links = array();
+		foreach ( $resolved['accepted'] as $placement ) {
+			$links[] = array(
+				'target_id'   => $placement['target']['id'],
+				'target_type' => $placement['target']['type'],
+				'keyword'     => $placement['anchor'],
+			);
+		}
+
+		return $links;
+	}
+
+	/**
+	 * Runs the matching pipeline and returns the DOM, root and accepted
+	 * placements.
+	 *
+	 * @param string  $content Content to scan.
+	 * @param WP_Post $post    Source post.
+	 * @return array|null
+	 */
+	private function resolve( $content, $post ) {
 		$data       = $this->get_candidates( $post );
 		$candidates = $data['candidates'];
 		$lookup     = $data['lookup'];
 		if ( empty( $candidates ) ) {
-			return $content;
+			return null;
 		}
 
 		$dom = $this->load_dom( $content );
 		if ( ! $dom ) {
-			return $content;
+			return null;
 		}
 
 		$xpath = new DOMXPath( $dom );
 		$root  = $xpath->query( '//*[@id="ilb-root"]' )->item( 0 );
 		if ( ! $root ) {
-			return $content;
+			return null;
 		}
 
 		$excluded = $this->excluded_tags();
@@ -331,24 +393,22 @@ class ILB_Engine {
 		}
 
 		if ( empty( $text_nodes ) ) {
-			return $content;
+			return null;
 		}
 
 		$pattern = $this->build_pattern( $candidates );
 		if ( '' === $pattern ) {
-			return $content;
+			return null;
 		}
 
 		$placements = $this->collect_placements( $text_nodes, $pattern, $lookup );
 		$accepted   = $this->select_placements( $placements, $post, $existing_urls );
 
-		if ( empty( $accepted ) ) {
-			return $content;
-		}
-
-		$this->apply_placements( $dom, $accepted );
-
-		return $this->inner_html( $dom, $root );
+		return array(
+			'dom'      => $dom,
+			'root'     => $root,
+			'accepted' => $accepted,
+		);
 	}
 
 	/**
@@ -594,7 +654,7 @@ class ILB_Engine {
 				}
 			}
 
-			$target = $this->choose_target( $placement['candidate'], $post, $source_terms, $used_urls, $per_target, $max_frequency );
+			$target = $this->choose_target( $placement['candidate'], $post, $source_terms, $used_urls, $per_target, $max_frequency, $unlimited );
 			if ( ! $target ) {
 				continue;
 			}
@@ -631,9 +691,10 @@ class ILB_Engine {
 	 * @param array   $used_urls     URLs already linked/selected.
 	 * @param array   $per_target    Per-target frequency counters.
 	 * @param int     $max_frequency Max links per target (0 = unlimited).
+	 * @param bool    $unlimited     Whether "link as often as possible" is on.
 	 * @return array|null Resolved target or null.
 	 */
-	private function choose_target( array $candidate, $post, array $source_terms, array $used_urls, array $per_target, $max_frequency ) {
+	private function choose_target( array $candidate, $post, array $source_terms, array $used_urls, array $per_target, $max_frequency, $unlimited ) {
 		foreach ( $candidate['targets'] as $ref ) {
 			// Never link a post to itself.
 			if ( 'post' === $ref['type'] && (int) $ref['id'] === (int) $post->ID ) {
@@ -658,10 +719,52 @@ class ILB_Engine {
 				continue;
 			}
 
+			if ( ! $this->target_passes_incoming_limit( $ref, $post, $unlimited ) ) {
+				continue;
+			}
+
 			return $target;
 		}
 
 		return null;
+	}
+
+	/**
+	 * Whether linking to a target stays within the global incoming-link limit.
+	 *
+	 * The count is read from the link graph, excluding the current source so a
+	 * source already credited with the link can still render it. During graph
+	 * generation the count accumulates as earlier sources are written.
+	 *
+	 * @param array   $ref       Target reference (id, type).
+	 * @param WP_Post $post      Source post.
+	 * @param bool    $unlimited Whether "link as often as possible" is on.
+	 * @return bool
+	 */
+	private function target_passes_incoming_limit( array $ref, $post, $unlimited ) {
+		if ( $unlimited ) {
+			return true;
+		}
+
+		// The limit applies when enabled globally or on the target itself.
+		$enabled = (bool) $this->settings->get( 'limit_incoming_links' );
+		if ( ! $enabled ) {
+			$overrides = $this->keywords->get_target_settings( $ref['id'], $ref['type'] );
+			$enabled   = ! empty( $overrides['limit_incoming_links'] );
+		}
+
+		if ( ! $enabled ) {
+			return true;
+		}
+
+		$max = (int) $this->settings->get( 'max_incoming_links' );
+		if ( $max <= 0 ) {
+			return true;
+		}
+
+		$current = $this->links->incoming_count( $ref['id'], $ref['type'], (int) $post->ID, 'post' );
+
+		return $current < $max;
 	}
 
 	/**

@@ -89,6 +89,16 @@ class ILB_Index {
 	}
 
 	/**
+	 * Converts the index table to the database's default character set and
+	 * collation. Returns true when the statement ran without error.
+	 *
+	 * @return bool
+	 */
+	public static function fix_collation() {
+		return ilb_convert_table_collation( self::table_name() );
+	}
+
+	/**
 	 * Drops the index table. Used on uninstall when data is not retained.
 	 */
 	public static function drop() {

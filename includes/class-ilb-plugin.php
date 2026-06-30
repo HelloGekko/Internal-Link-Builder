@@ -78,6 +78,20 @@ final class ILB_Plugin {
 	public $engine;
 
 	/**
+	 * Link graph / statistics handler.
+	 *
+	 * @var ILB_Links
+	 */
+	public $links;
+
+	/**
+	 * Index/link-graph generator.
+	 *
+	 * @var ILB_Generator
+	 */
+	public $generator;
+
+	/**
 	 * Retrieves the singleton instance.
 	 *
 	 * @return ILB_Plugin
@@ -107,8 +121,10 @@ final class ILB_Plugin {
 	private function includes() {
 		require_once ILB_PLUGIN_DIR . 'includes/class-ilb-settings.php';
 		require_once ILB_PLUGIN_DIR . 'includes/class-ilb-index.php';
+		require_once ILB_PLUGIN_DIR . 'includes/class-ilb-links.php';
 		require_once ILB_PLUGIN_DIR . 'includes/class-ilb-keywords.php';
 		require_once ILB_PLUGIN_DIR . 'includes/class-ilb-engine.php';
+		require_once ILB_PLUGIN_DIR . 'includes/class-ilb-generator.php';
 		require_once ILB_PLUGIN_DIR . 'includes/class-ilb-admin-bar.php';
 		require_once ILB_PLUGIN_DIR . 'includes/class-ilb-actions.php';
 
@@ -125,9 +141,12 @@ final class ILB_Plugin {
 		$this->settings = new ILB_Settings();
 		$this->settings->hooks();
 
-		$this->index    = new ILB_Index();
-		$this->keywords = new ILB_Keywords( $this->settings, $this->index );
-		$this->engine   = new ILB_Engine( $this->settings, $this->index, $this->keywords );
+		$this->index     = new ILB_Index();
+		$this->links     = new ILB_Links();
+		$this->keywords  = new ILB_Keywords( $this->settings, $this->index );
+		$this->engine    = new ILB_Engine( $this->settings, $this->index, $this->keywords, $this->links );
+		$this->generator = new ILB_Generator( $this->settings, $this->engine, $this->links );
+		$this->generator->hooks();
 
 		$this->admin_bar = new ILB_Admin_Bar( $this->settings );
 		$this->actions   = new ILB_Actions( $this->settings );
@@ -155,14 +174,16 @@ final class ILB_Plugin {
 		}
 
 		ILB_Index::install();
+		ILB_Links::install();
 	}
 
 	/**
 	 * Deactivation callback. Intentionally non-destructive.
 	 */
 	public function deactivate() {
-		// No-op for now. Data removal is handled in uninstall.php and
-		// respects the "keep data on uninstall" setting.
+		// Stop any pending background generation; data removal is handled in
+		// uninstall.php and respects the "keep data on uninstall" setting.
+		ILB_Generator::cancel_all();
 	}
 
 	/**

@@ -3,7 +3,7 @@
  * Plugin Name:       Internal Link Builder
  * Plugin URI:        https://hellogekko.nl/internal-link-builder
  * Description:        Automatically generates internal links in the front-end based on keywords configured on target posts, pages and terms.
- * Version:           0.3.0
+ * Version:           0.4.0
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            HelloGekko
@@ -23,7 +23,7 @@ defined( 'ABSPATH' ) || exit;
  * Constants
  * -----------------------------------------------------------------------------
  */
-define( 'ILB_VERSION', '0.3.0' );
+define( 'ILB_VERSION', '0.4.0' );
 define( 'ILB_PLUGIN_FILE', __FILE__ );
 define( 'ILB_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ILB_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -46,6 +46,31 @@ define( 'ILB_PAGE_SLUG', 'internal-link-builder' );
  * -----------------------------------------------------------------------------
  */
 require_once ILB_PLUGIN_DIR . 'includes/class-ilb-plugin.php';
+
+/**
+ * Converts one of the plugin's tables to the database's default character set
+ * and collation. Used by the "Fix collations" maintenance tool.
+ *
+ * The table name is built from $wpdb->prefix and the charset/collation come
+ * from the database configuration, so no user input reaches the statement.
+ *
+ * @param string $table Fully-qualified table name.
+ * @return bool True when the conversion ran without error.
+ */
+function ilb_convert_table_collation( $table ) {
+	global $wpdb;
+
+	if ( empty( $wpdb->charset ) ) {
+		return false;
+	}
+
+	$sql = "ALTER TABLE `{$table}` CONVERT TO CHARACTER SET {$wpdb->charset}";
+	if ( ! empty( $wpdb->collate ) ) {
+		$sql .= " COLLATE {$wpdb->collate}";
+	}
+
+	return false !== $wpdb->query( $sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+}
 
 /**
  * Returns the main plugin instance.

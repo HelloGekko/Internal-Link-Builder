@@ -147,6 +147,14 @@ class ILB_Keywords {
 		if ( 'automatic' === $this->settings->get( 'index_generation_mode' ) ) {
 			$this->index->rebuild_for_target( $target_id, $target_type, $keywords );
 		}
+
+		/**
+		 * Fires after a target's keywords have been saved.
+		 *
+		 * @param int    $target_id   Target object ID.
+		 * @param string $target_type 'post' or 'term'.
+		 */
+		do_action( 'ilb_keywords_saved', $target_id, $target_type );
 	}
 
 	/**

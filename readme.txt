@@ -4,7 +4,7 @@ Tags: internal links, seo, automatic linking, interlinking, keywords
 Requires at least: 5.8
 Tested up to: 6.5
 Requires PHP: 7.4
-Stable tag: 0.3.0
+Stable tag: 0.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -43,6 +43,17 @@ keyword configuration and the front-end linking engine.
    limits. The original content in the database is never changed.
 
 == Changelog ==
+
+= 0.4.0 =
+* Add the link graph / statistics table (wp_ilb_links) and a batched generator
+  that rebuilds it, using Action Scheduler when available and WP-Cron otherwise.
+* The batch size and "Index generation mode" settings are now functional; in
+  automatic mode content, keyword and settings changes schedule a debounced
+  rebuild.
+* Enforce the global incoming-link limit in the front-end engine, reading
+  counts from the link graph.
+* "Cancel schedules" now cancels pending generation work; "Fix collations"
+  aligns the plugin tables to the database's default collation.
 
 = 0.3.0 =
 * Add the front-end linking engine (the_content filter, DOMDocument based) that

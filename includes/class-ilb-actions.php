@@ -57,20 +57,12 @@ class ILB_Actions {
 	}
 
 	/**
-	 * Cancels all pending scheduled actions in the plugin's group.
+	 * Cancels all pending generation work (Action Scheduler and WP-Cron).
 	 */
 	public function ajax_cancel_schedules() {
 		$this->guard();
 
-		if ( ! function_exists( 'as_unschedule_all_actions' ) ) {
-			wp_send_json_success(
-				array(
-					'message' => __( 'Action Scheduler is not available; there is nothing to cancel.', 'internal-link-builder' ),
-				)
-			);
-		}
-
-		as_unschedule_all_actions( '', array(), self::SCHEDULE_GROUP );
+		ILB_Generator::cancel_all();
 
 		wp_send_json_success(
 			array(
@@ -80,23 +72,30 @@ class ILB_Actions {
 	}
 
 	/**
-	 * Placeholder for the collation-fixing maintenance tool.
-	 *
-	 * The statistics tables are introduced together with the linking engine;
-	 * until then this reports that there is nothing to repair.
+	 * Converts the plugin's tables to the database's default collation.
 	 */
 	public function ajax_fix_collations() {
 		$this->guard();
 
+		$index_ok = ILB_Index::fix_collation();
+		$links_ok = ILB_Links::fix_collation();
+
 		/**
-		 * Fires when the "Fix collations" maintenance tool runs. The linking
-		 * engine hooks here to align table collations once its tables exist.
+		 * Fires after the "Fix collations" maintenance tool has run.
 		 */
 		do_action( 'ilb_fix_collations' );
 
-		wp_send_json_success(
+		if ( $index_ok && $links_ok ) {
+			wp_send_json_success(
+				array(
+					'message' => __( 'Collations have been aligned for the keyword index and link tables.', 'internal-link-builder' ),
+				)
+			);
+		}
+
+		wp_send_json_error(
 			array(
-				'message' => __( 'Collation check complete. No statistics tables require fixing yet.', 'internal-link-builder' ),
+				'message' => __( 'Could not align all table collations. Please check your database permissions.', 'internal-link-builder' ),
 			)
 		);
 	}
