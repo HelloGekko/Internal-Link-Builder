@@ -4,7 +4,7 @@ Tags: internal links, seo, automatic linking, interlinking, keywords
 Requires at least: 5.8
 Tested up to: 6.5
 Requires PHP: 7.4
-Stable tag: 0.7.0
+Stable tag: 0.8.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -17,8 +17,9 @@ want to *receive* internal links. Whenever those keywords appear in the content
 of other posts, the plugin turns them into links to the configured target — on
 the fly, without modifying your stored content.
 
-This release ships the settings screen, the keyword index storage, the per-post
-keyword configuration and the front-end linking engine.
+The plugin includes the settings screen, keyword index, per-post and per-term
+keyword configuration, the front-end linking engine, a batched index generator
+with a progress indicator, and an optional advanced custom-field linking mode.
 
 = Settings overview =
 
@@ -43,6 +44,19 @@ keyword configuration and the front-end linking engine.
    limits. The original content in the database is never changed.
 
 == Changelog ==
+
+= 0.8.0 =
+* Add a schema-version upgrade routine so plugin updates create/upgrade tables
+  without a manual reactivate; create tables per site on multisite.
+* Custom-field linking is now an explicit opt-in ("Enable custom field linking")
+  with a clear warning, off by default.
+* Generator renders blocks (do_blocks) so the link graph matches the front end.
+* Performance: the keyword candidate map is cached per index change instead of
+  being rebuilt on every render and every source during generation.
+* Add an ilb_should_link_content filter for theme/FSE overrides; validate
+  collation identifiers; minor cleanup.
+* Add a PHPUnit test suite, PHPCS (WordPress) config and a GitHub Actions CI
+  workflow.
 
 = 0.7.0 =
 * Fix: saving one settings tab no longer wipes the others. Settings are now

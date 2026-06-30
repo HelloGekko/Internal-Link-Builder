@@ -70,6 +70,20 @@ class ILB_Engine {
 	private $override_cache = array();
 
 	/**
+	 * Memoised base candidate map (keyword groups), keyed by index token.
+	 *
+	 * @var array|null
+	 */
+	private $base_candidates = null;
+
+	/**
+	 * Index token the base candidate memo was built for.
+	 *
+	 * @var int|null
+	 */
+	private $base_token = null;
+
+	/**
 	 * Re-entrancy guard for the custom-field meta filters.
 	 *
 	 * @var bool
@@ -94,13 +108,16 @@ class ILB_Engine {
 		add_filter( 'the_content', array( $this, 'filter_content' ), 20 );
 		add_filter( 'get_the_archive_description', array( $this, 'filter_term_description' ), 20 );
 
-		// Custom-field linking: only hook the (hot) meta filters when at least
-		// one custom field is configured, to avoid site-wide overhead otherwise.
-		if ( ! empty( (array) $this->settings->get( 'post_custom_fields' ) ) ) {
-			add_filter( 'get_post_metadata', array( $this, 'filter_post_meta' ), 20, 4 );
-		}
-		if ( ! empty( (array) $this->settings->get( 'term_custom_fields' ) ) ) {
-			add_filter( 'get_term_metadata', array( $this, 'filter_term_meta' ), 20, 4 );
+		// Custom-field linking is an opt-in advanced feature. Only hook the (hot)
+		// meta filters when explicitly enabled AND fields are configured, to
+		// avoid both site-wide overhead and accidental breakage.
+		if ( $this->settings->get( 'enable_custom_field_linking' ) ) {
+			if ( ! empty( (array) $this->settings->get( 'post_custom_fields' ) ) ) {
+				add_filter( 'get_post_metadata', array( $this, 'filter_post_meta' ), 20, 4 );
+			}
+			if ( ! empty( (array) $this->settings->get( 'term_custom_fields' ) ) ) {
+				add_filter( 'get_term_metadata', array( $this, 'filter_term_meta' ), 20, 4 );
+			}
 		}
 	}
 
@@ -121,7 +138,16 @@ class ILB_Engine {
 			return $content;
 		}
 
-		if ( ! is_singular() || ! in_the_loop() || ! is_main_query() ) {
+		/**
+		 * Filters whether the engine should process the current the_content call.
+		 *
+		 * Defaults to singular, main-query, in-the-loop content. Themes (e.g.
+		 * some block/FSE setups) can override this to widen or narrow coverage.
+		 *
+		 * @param bool $should_link Whether to inject links here.
+		 */
+		$should_link = is_singular() && in_the_loop() && is_main_query();
+		if ( ! apply_filters( 'ilb_should_link_content', $should_link ) ) {
 			return $content;
 		}
 
@@ -312,9 +338,10 @@ class ILB_Engine {
 			return array();
 		}
 
-		// Approximate the rendered structure: paragraphs via wpautop, without
-		// executing shortcodes (which may have side effects during generation).
-		$content = wpautop( $post->post_content );
+		// Approximate the rendered structure: render blocks and apply wpautop so
+		// the graph matches what the front end produces. Shortcodes are left
+		// unexpanded to avoid side effects during background generation.
+		$content = wpautop( do_blocks( $post->post_content ) );
 
 		return $this->extract_links(
 			$content,
@@ -468,8 +495,8 @@ class ILB_Engine {
 	 * }
 	 */
 	private function get_candidates( array $source ) {
-		$rows = $this->index->all_rows();
-		if ( empty( $rows ) ) {
+		$base = $this->base_candidates();
+		if ( empty( $base ) ) {
 			return array(
 				'candidates' => array(),
 				'lookup'     => array(),
@@ -477,33 +504,17 @@ class ILB_Engine {
 		}
 
 		// Keywords the source explicitly excludes from linking in its content.
-		$blocked = array_map( 'strtolower', $this->keywords->get_content_blacklist( $source['id'], $source['type'] ) );
-		$blocked = array_flip( $blocked );
+		$blocked = array_flip(
+			array_map( 'strtolower', $this->keywords->get_content_blacklist( $source['id'], $source['type'] ) )
+		);
 
-		$by_keyword = array();
-		$seq        = 0;
-		foreach ( $rows as $row ) {
-			$lower = $row['keyword_lower'];
-			if ( isset( $blocked[ $lower ] ) ) {
-				continue;
+		$candidates = array();
+		foreach ( $base as $lower => $candidate ) {
+			if ( ! isset( $blocked[ $lower ] ) ) {
+				$candidates[] = $candidate;
 			}
-
-			if ( ! isset( $by_keyword[ $lower ] ) ) {
-				$by_keyword[ $lower ] = array(
-					'keyword' => $row['keyword'],
-					'lower'   => $lower,
-					'seq'     => $seq++,
-					'targets' => array(),
-				);
-			}
-
-			$by_keyword[ $lower ]['targets'][] = array(
-				'id'   => (int) $row['target_id'],
-				'type' => $row['target_type'],
-			);
 		}
 
-		$candidates = array_values( $by_keyword );
 		$this->sort_candidates( $candidates, (string) $this->settings->get( 'keyword_order' ) );
 
 		$lookup = array();
@@ -516,6 +527,54 @@ class ILB_Engine {
 			'candidates' => $candidates,
 			'lookup'     => $lookup,
 		);
+	}
+
+	/**
+	 * Builds (and caches) the base keyword-group map from the index.
+	 *
+	 * The result is memoised per request and stored in the object cache keyed by
+	 * the index token, so the full index is read at most once per change — not
+	 * once per rendered post or per source during generation.
+	 *
+	 * @return array<string,array> Map of lowercased keyword => candidate group.
+	 */
+	private function base_candidates() {
+		$token = ILB_Index::token();
+		if ( null !== $this->base_candidates && $this->base_token === $token ) {
+			return $this->base_candidates;
+		}
+
+		$cache_key = 'ilb_base_candidates_' . $token;
+		$cached    = wp_cache_get( $cache_key, 'ilb' );
+		if ( is_array( $cached ) ) {
+			$this->base_candidates = $cached;
+			$this->base_token      = $token;
+			return $cached;
+		}
+
+		$by_keyword = array();
+		$seq        = 0;
+		foreach ( $this->index->all_rows() as $row ) {
+			$lower = $row['keyword_lower'];
+			if ( ! isset( $by_keyword[ $lower ] ) ) {
+				$by_keyword[ $lower ] = array(
+					'keyword' => $row['keyword'],
+					'lower'   => $lower,
+					'seq'     => $seq++,
+					'targets' => array(),
+				);
+			}
+			$by_keyword[ $lower ]['targets'][] = array(
+				'id'   => (int) $row['target_id'],
+				'type' => $row['target_type'],
+			);
+		}
+
+		wp_cache_set( $cache_key, $by_keyword, 'ilb', HOUR_IN_SECONDS );
+		$this->base_candidates = $by_keyword;
+		$this->base_token      = $token;
+
+		return $by_keyword;
 	}
 
 	/**

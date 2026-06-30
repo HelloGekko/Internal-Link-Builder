@@ -120,6 +120,10 @@ final class ILB_Plugin {
 		$this->register_lifecycle_hooks();
 
 		add_action( 'plugins_loaded', array( $this, 'load_textdomain' ) );
+		add_action( 'plugins_loaded', array( $this, 'maybe_upgrade' ) );
+
+		// Create tables when a new site is added on multisite.
+		add_action( 'wp_initialize_site', array( $this, 'on_new_site' ), 20 );
 	}
 
 	/**
@@ -175,11 +179,71 @@ final class ILB_Plugin {
 	}
 
 	/**
-	 * Activation callback. Seeds default settings when none exist.
+	 * Activation callback.
+	 *
+	 * @param bool $network_wide Whether the plugin is network-activated.
 	 */
-	public function activate() {
+	public function activate( $network_wide = false ) {
+		if ( is_multisite() && $network_wide ) {
+			$site_ids = get_sites(
+				array(
+					'fields'   => 'ids',
+					'number'   => 0,
+					'no_found_rows' => true,
+				)
+			);
+			foreach ( $site_ids as $site_id ) {
+				switch_to_blog( (int) $site_id );
+				$this->install_site();
+				restore_current_blog();
+			}
+
+			return;
+		}
+
+		$this->install_site();
+	}
+
+	/**
+	 * Installs tables and default settings for the current site.
+	 */
+	private function install_site() {
 		if ( false === get_option( ILB_SETTINGS_OPTION, false ) ) {
 			add_option( ILB_SETTINGS_OPTION, ILB_Settings::defaults() );
+		}
+
+		ILB_Index::install();
+		ILB_Links::install();
+	}
+
+	/**
+	 * Installs tables for a newly created multisite blog.
+	 *
+	 * @param WP_Site $new_site New site object.
+	 */
+	public function on_new_site( $new_site ) {
+		if ( ! function_exists( 'is_plugin_active_for_network' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		}
+
+		if ( ! is_plugin_active_for_network( ILB_PLUGIN_BASENAME ) ) {
+			return;
+		}
+
+		switch_to_blog( (int) $new_site->blog_id );
+		$this->install_site();
+		restore_current_blog();
+	}
+
+	/**
+	 * Runs deferred table installs/upgrades when the schema version changed.
+	 *
+	 * Ensures plugin updates that add or change tables take effect without a
+	 * manual deactivate/reactivate.
+	 */
+	public function maybe_upgrade() {
+		if ( get_option( ILB_Index::DB_VERSION_OPTION ) === ILB_Index::DB_VERSION ) {
+			return;
 		}
 
 		ILB_Index::install();

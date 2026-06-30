@@ -38,6 +38,17 @@ class ILB_Settings {
 	 */
 	public function hooks() {
 		add_action( 'admin_init', array( $this, 'register' ) );
+
+		// Keep the in-memory cache in sync when the option changes.
+		add_action( 'add_option_' . ILB_SETTINGS_OPTION, array( $this, 'flush_cache' ) );
+		add_action( 'update_option_' . ILB_SETTINGS_OPTION, array( $this, 'flush_cache' ) );
+	}
+
+	/**
+	 * Clears the in-memory settings cache.
+	 */
+	public function flush_cache() {
+		$this->cache = null;
 	}
 
 	/*
@@ -279,23 +290,31 @@ class ILB_Settings {
 				'options'     => array( $this, 'hierarchical_taxonomy_options' ),
 				'placeholder' => __( 'Type a taxonomy…', 'internal-link-builder' ),
 			),
+			'enable_custom_field_linking' => array(
+				'type'        => 'toggle',
+				'label'       => __( 'Enable custom field linking (advanced)', 'internal-link-builder' ),
+				'description' => __( 'Advanced: when enabled, the values of the custom fields configured below are filtered on the front end to inject links. Only enable this for fields whose value is displayed as text. Fields used for other purposes (URLs, CSS classes, numbers, internal data) can break your theme or other plugins.', 'internal-link-builder' ),
+				'default'     => 0,
+			),
 			'post_custom_fields'        => array(
 				'type'        => 'token',
 				'token_mode'  => 'freeform',
 				'token_value' => 'text',
 				'label'       => __( 'Custom fields of posts that get used for linking', 'internal-link-builder' ),
-				'description' => __( 'A list of post custom fields that should be used for automatic linking. Type a meta key and press Enter. Leave empty to not link any custom fields.', 'internal-link-builder' ),
+				'description' => __( 'A list of post custom fields that should be used for automatic linking. Requires "Enable custom field linking" above. Type a meta key and press Enter. Leave empty to not link any custom fields.', 'internal-link-builder' ),
 				'default'     => array(),
 				'placeholder' => __( 'meta_key', 'internal-link-builder' ),
+				'depends_on'  => 'enable_custom_field_linking',
 			),
 			'term_custom_fields'        => array(
 				'type'        => 'token',
 				'token_mode'  => 'freeform',
 				'token_value' => 'text',
 				'label'       => __( 'Custom fields of terms that get used for linking', 'internal-link-builder' ),
-				'description' => __( 'A list of term custom fields that should be used for automatic linking. Type a meta key and press Enter. Leave empty to not link any custom fields.', 'internal-link-builder' ),
+				'description' => __( 'A list of term custom fields that should be used for automatic linking. Requires "Enable custom field linking" above. Type a meta key and press Enter. Leave empty to not link any custom fields.', 'internal-link-builder' ),
 				'default'     => array(),
 				'placeholder' => __( 'meta_key', 'internal-link-builder' ),
+				'depends_on'  => 'enable_custom_field_linking',
 			),
 		);
 	}

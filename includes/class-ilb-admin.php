@@ -376,10 +376,6 @@ class ILB_Admin {
 				$this->render_select( $name, $id, $field, $value );
 				break;
 
-			case 'multiselect':
-				$this->render_multiselect( $name, $id, $field, $value );
-				break;
-
 			case 'multicheck':
 				$this->render_multicheck( $name, $field, $value );
 				break;
@@ -468,29 +464,6 @@ class ILB_Admin {
 				'<option value="%1$s"%2$s>%3$s</option>',
 				esc_attr( $opt_value ),
 				selected( (string) $value, (string) $opt_value, false ),
-				esc_html( $opt_label )
-			);
-		}
-		echo '</select>';
-	}
-
-	/**
-	 * Renders a multi-select list.
-	 *
-	 * @param string $name  Field name.
-	 * @param string $id    Field id.
-	 * @param array  $field Field definition.
-	 * @param mixed  $value Current values.
-	 */
-	private function render_multiselect( $name, $id, array $field, $value ) {
-		$options  = $this->settings->resolve_options( $field );
-		$selected = is_array( $value ) ? $value : array();
-		echo '<select multiple class="ilb-multiselect" id="' . esc_attr( $id ) . '" name="' . esc_attr( $name ) . '[]" size="' . esc_attr( min( 8, max( 4, count( $options ) ) ) ) . '">';
-		foreach ( $options as $opt_value => $opt_label ) {
-			printf(
-				'<option value="%1$s"%2$s>%3$s</option>',
-				esc_attr( $opt_value ),
-				in_array( (string) $opt_value, array_map( 'strval', $selected ), true ) ? ' selected="selected"' : '',
 				esc_html( $opt_label )
 			);
 		}

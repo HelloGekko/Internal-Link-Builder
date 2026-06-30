@@ -336,10 +336,9 @@ class ILB_Generator {
 
 		$step = isset( $_POST['step'] ) ? sanitize_key( wp_unslash( $_POST['step'] ) ) : 'begin';
 
-		// Background scheduling is redundant while running in the foreground.
-		self::cancel_all();
-
 		if ( 'begin' === $step ) {
+			// Background scheduling is redundant while running in the foreground.
+			self::cancel_all();
 			$this->links->clear_all();
 			$total = $this->source_total();
 			$this->set_status(

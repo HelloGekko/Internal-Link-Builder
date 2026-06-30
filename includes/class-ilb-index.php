@@ -20,7 +20,7 @@ class ILB_Index {
 	/**
 	 * Schema version, bumped when the table structure changes.
 	 */
-	const DB_VERSION = '1.0.0';
+	const DB_VERSION = '1.1.0';
 
 	/**
 	 * Option key tracking the installed schema version.
