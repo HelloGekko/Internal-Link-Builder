@@ -1,0 +1,126 @@
+/* Internal Link Builder - admin settings styles. */
+
+.ilb-wrap .ilb-tabs {
+	margin-bottom: 1em;
+}
+
+.ilb-form-table th {
+	width: 320px;
+	vertical-align: top;
+	padding-top: 16px;
+}
+
+.ilb-form-table td {
+	vertical-align: top;
+}
+
+.ilb-form-table .description {
+	max-width: 640px;
+}
+
+/* Toggle switch. */
+.ilb-switch {
+	position: relative;
+	display: inline-block;
+	width: 44px;
+	height: 24px;
+	vertical-align: middle;
+}
+
+.ilb-switch input[type="checkbox"] {
+	position: absolute;
+	opacity: 0;
+	width: 44px;
+	height: 24px;
+	margin: 0;
+	cursor: pointer;
+	z-index: 2;
+}
+
+.ilb-switch-slider {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: #c3c4c7;
+	border-radius: 24px;
+	transition: background 0.15s ease-in-out;
+}
+
+.ilb-switch-slider::before {
+	content: "";
+	position: absolute;
+	height: 18px;
+	width: 18px;
+	left: 3px;
+	top: 3px;
+	background: #fff;
+	border-radius: 50%;
+	transition: transform 0.15s ease-in-out;
+}
+
+.ilb-switch input[type="checkbox"]:checked + .ilb-switch-slider {
+	background: #2271b1;
+}
+
+.ilb-switch input[type="checkbox"]:checked + .ilb-switch-slider::before {
+	transform: translateX(20px);
+}
+
+.ilb-switch input[type="checkbox"]:focus + .ilb-switch-slider {
+	box-shadow: 0 0 0 2px #fff, 0 0 0 4px #2271b1;
+}
+
+/* Multi-check fieldset. */
+.ilb-multicheck label {
+	display: block;
+	margin-bottom: 4px;
+}
+
+.ilb-multiselect {
+	min-width: 320px;
+}
+
+/* Repeatable rows. */
+.ilb-repeatable-row {
+	display: flex;
+	align-items: center;
+	margin-bottom: 6px;
+	gap: 6px;
+}
+
+.ilb-repeatable-row input[type="text"] {
+	width: 320px;
+}
+
+.ilb-repeatable-remove {
+	color: #b32d2e;
+	text-decoration: none;
+	font-size: 18px;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.ilb-repeatable-add {
+	margin-top: 4px;
+}
+
+/* Conditionally hidden (depends_on) rows. */
+.ilb-form-table tr.ilb-row-disabled {
+	opacity: 0.5;
+}
+
+/* Action results. */
+.ilb-action-result {
+	margin-left: 10px;
+	font-style: italic;
+}
+
+.ilb-action-result.ilb-success {
+	color: #008a20;
+}
+
+.ilb-action-result.ilb-error {
+	color: #b32d2e;
+}
