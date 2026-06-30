@@ -18,6 +18,11 @@ class ILB_Admin {
 	const PAGE_SLUG = 'internal-link-builder';
 
 	/**
+	 * Nonce action for the token search endpoints.
+	 */
+	const SEARCH_NONCE = 'ilb_token_search';
+
+	/**
 	 * Settings handler.
 	 *
 	 * @var ILB_Settings
@@ -35,6 +40,102 @@ class ILB_Admin {
 		add_action( 'admin_menu', array( $this, 'register_menu' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
 		add_filter( 'plugin_action_links_' . ILB_PLUGIN_BASENAME, array( $this, 'plugin_action_links' ) );
+
+		add_action( 'wp_ajax_ilb_search_posts', array( $this, 'ajax_search_posts' ) );
+		add_action( 'wp_ajax_ilb_search_terms', array( $this, 'ajax_search_terms' ) );
+	}
+
+	/**
+	 * Verifies the token-search request, dying on failure.
+	 */
+	private function guard_search() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array(), 403 );
+		}
+		check_ajax_referer( self::SEARCH_NONCE, 'nonce' );
+	}
+
+	/**
+	 * AJAX: searches posts by title within the whitelisted post types.
+	 */
+	public function ajax_search_posts() {
+		$this->guard_search();
+
+		$search     = isset( $_GET['q'] ) ? sanitize_text_field( wp_unslash( $_GET['q'] ) ) : '';
+		$post_types = (array) $this->settings->get( 'whitelist_post_types' );
+		if ( empty( $post_types ) ) {
+			$post_types = get_post_types( array( 'public' => true ) );
+		}
+
+		$query = new WP_Query(
+			array(
+				'post_type'              => $post_types,
+				'post_status'            => 'publish',
+				's'                      => $search,
+				'posts_per_page'         => 20,
+				'orderby'                => 'title',
+				'order'                  => 'ASC',
+				'no_found_rows'          => true,
+				'update_post_meta_cache' => false,
+				'update_post_term_cache' => false,
+			)
+		);
+
+		$results = array();
+		foreach ( $query->posts as $post ) {
+			$results[] = array(
+				'id'   => $post->ID,
+				'text' => $this->token_label( get_the_title( $post ), $post->ID ),
+			);
+		}
+
+		wp_send_json_success( $results );
+	}
+
+	/**
+	 * AJAX: searches terms by name within the whitelisted taxonomies.
+	 */
+	public function ajax_search_terms() {
+		$this->guard_search();
+
+		$search     = isset( $_GET['q'] ) ? sanitize_text_field( wp_unslash( $_GET['q'] ) ) : '';
+		$taxonomies = (array) $this->settings->get( 'whitelist_taxonomies' );
+		if ( empty( $taxonomies ) ) {
+			$taxonomies = get_taxonomies( array( 'public' => true ) );
+		}
+
+		$terms = get_terms(
+			array(
+				'taxonomy'   => $taxonomies,
+				'hide_empty' => false,
+				'search'     => $search,
+				'number'     => 20,
+			)
+		);
+
+		$results = array();
+		if ( ! is_wp_error( $terms ) ) {
+			foreach ( $terms as $term ) {
+				$results[] = array(
+					'id'   => $term->term_id,
+					'text' => $this->token_label( $term->name, $term->term_id ),
+				);
+			}
+		}
+
+		wp_send_json_success( $results );
+	}
+
+	/**
+	 * Formats a token label as "Title (ID: 123)".
+	 *
+	 * @param string $title Object title/name.
+	 * @param int    $id    Object ID.
+	 * @return string
+	 */
+	private function token_label( $title, $id ) {
+		/* translators: 1: object title, 2: object ID. */
+		return sprintf( __( '%1$s (ID: %2$d)', 'internal-link-builder' ), $title, (int) $id );
 	}
 
 	/**
@@ -91,6 +192,14 @@ class ILB_Admin {
 			true
 		);
 
+		wp_enqueue_script(
+			'ilb-token',
+			ILB_PLUGIN_URL . 'assets/js/token-select.js',
+			array( 'jquery' ),
+			ILB_VERSION,
+			true
+		);
+
 		wp_localize_script(
 			'ilb-admin',
 			'ilbAdmin',
@@ -102,6 +211,20 @@ class ILB_Admin {
 					'working'       => __( 'Working…', 'internal-link-builder' ),
 					'remove'        => __( 'Remove', 'internal-link-builder' ),
 					'addLine'       => __( 'Add line', 'internal-link-builder' ),
+				),
+			)
+		);
+
+		wp_localize_script(
+			'ilb-token',
+			'ilbToken',
+			array(
+				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+				'nonce'   => wp_create_nonce( self::SEARCH_NONCE ),
+				'i18n'    => array(
+					'remove'    => __( 'Remove', 'internal-link-builder' ),
+					'searching' => __( 'Searching…', 'internal-link-builder' ),
+					'noResults' => __( 'No results', 'internal-link-builder' ),
 				),
 			)
 		);
@@ -240,6 +363,10 @@ class ILB_Admin {
 				$this->render_multicheck( $name, $field, $value );
 				break;
 
+			case 'token':
+				$this->render_token( $name, $id, $field, $value );
+				break;
+
 			case 'repeatable':
 				$this->render_repeatable( $name, $id, $field, $value );
 				break;
@@ -370,6 +497,128 @@ class ILB_Admin {
 			);
 		}
 		echo '</fieldset>';
+	}
+
+	/**
+	 * Renders a token / chip multi-select with typeahead.
+	 *
+	 * Emits a container the JS component (token-select.js) enhances. The current
+	 * selection is seeded as JSON so labels appear without an extra round-trip.
+	 *
+	 * @param string $name  Field name.
+	 * @param string $id    Field id.
+	 * @param array  $field Field definition.
+	 * @param mixed  $value Current values.
+	 */
+	private function render_token( $name, $id, array $field, $value ) {
+		$mode        = isset( $field['token_mode'] ) ? $field['token_mode'] : 'freeform';
+		$source      = isset( $field['token_source'] ) ? $field['token_source'] : '';
+		$placeholder = isset( $field['placeholder'] ) ? $field['placeholder'] : '';
+		$selected    = is_array( $value ) ? $value : array();
+
+		$selected_data = $this->token_selected_data( $field, $selected );
+		$options_data  = ( 'static' === $mode ) ? $this->token_options_data( $field ) : array();
+		?>
+		<div
+			class="ilb-token"
+			id="<?php echo esc_attr( $id ); ?>"
+			data-name="<?php echo esc_attr( $name ); ?>"
+			data-mode="<?php echo esc_attr( $mode ); ?>"
+			data-source="<?php echo esc_attr( $source ); ?>"
+			data-placeholder="<?php echo esc_attr( $placeholder ); ?>"
+			data-selected="<?php echo esc_attr( wp_json_encode( $selected_data ) ); ?>"
+			data-options="<?php echo esc_attr( wp_json_encode( $options_data ) ); ?>"
+		>
+			<noscript>
+				<?php
+				// Fallback for no-JS: a plain comma-separated readout.
+				$labels = wp_list_pluck( $selected_data, 'text' );
+				echo esc_html( implode( ', ', $labels ) );
+				?>
+			</noscript>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Builds the [{id,text}] list for the currently selected token values.
+	 *
+	 * @param array $field    Field definition.
+	 * @param array $selected Stored values.
+	 * @return array[]
+	 */
+	private function token_selected_data( array $field, array $selected ) {
+		$source = isset( $field['token_source'] ) ? $field['token_source'] : '';
+		$mode   = isset( $field['token_mode'] ) ? $field['token_mode'] : 'freeform';
+		$data   = array();
+
+		if ( 'ajax' === $mode && 'post' === $source ) {
+			foreach ( $selected as $id ) {
+				$post = get_post( (int) $id );
+				if ( $post instanceof WP_Post ) {
+					$data[] = array(
+						'id'   => (int) $id,
+						'text' => $this->token_label( get_the_title( $post ), (int) $id ),
+					);
+				}
+			}
+			return $data;
+		}
+
+		if ( 'ajax' === $mode && 'term' === $source ) {
+			foreach ( $selected as $id ) {
+				$term = get_term( (int) $id );
+				if ( $term instanceof WP_Term ) {
+					$data[] = array(
+						'id'   => (int) $id,
+						'text' => $this->token_label( $term->name, (int) $id ),
+					);
+				}
+			}
+			return $data;
+		}
+
+		if ( 'static' === $mode ) {
+			$options = $this->settings->resolve_options( $field );
+			foreach ( $selected as $slug ) {
+				if ( isset( $options[ $slug ] ) ) {
+					$data[] = array(
+						'id'   => (string) $slug,
+						'text' => $options[ $slug ],
+					);
+				}
+			}
+			return $data;
+		}
+
+		// Freeform: the value is its own label.
+		foreach ( $selected as $text ) {
+			$data[] = array(
+				'id'   => (string) $text,
+				'text' => (string) $text,
+			);
+		}
+
+		return $data;
+	}
+
+	/**
+	 * Builds the [{id,text}] option list for a static token field.
+	 *
+	 * @param array $field Field definition.
+	 * @return array[]
+	 */
+	private function token_options_data( array $field ) {
+		$options = $this->settings->resolve_options( $field );
+		$data    = array();
+		foreach ( $options as $slug => $label ) {
+			$data[] = array(
+				'id'   => (string) $slug,
+				'text' => $label,
+			);
+		}
+
+		return $data;
 	}
 
 	/**

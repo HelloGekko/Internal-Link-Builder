@@ -4,7 +4,7 @@ Tags: internal links, seo, automatic linking, interlinking, keywords
 Requires at least: 5.8
 Tested up to: 6.5
 Requires PHP: 7.4
-Stable tag: 0.5.0
+Stable tag: 0.6.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -43,6 +43,14 @@ keyword configuration and the front-end linking engine.
    limits. The original content in the database is never changed.
 
 == Changelog ==
+
+= 0.6.0 =
+* Replace the post-type, taxonomy, post and term selection fields with a
+  searchable token / chip control: type a name to find and add posts or terms
+  (showing "Title (ID: n)"), and type-ahead chips for post types and taxonomies.
+* Custom-field settings are now free-form tag inputs.
+* Add admin-ajax search endpoints for posts and terms (capability and nonce
+  protected).
 
 = 0.5.0 =
 * Add per-term keyword configuration on the add/edit screens of whitelisted

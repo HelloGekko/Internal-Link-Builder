@@ -140,25 +140,34 @@ class ILB_Settings {
 	private function content_fields() {
 		return array(
 			'whitelist_post_types'      => array(
-				'type'        => 'multiselect',
+				'type'        => 'token',
+				'token_mode'  => 'static',
+				'token_value' => 'slug',
 				'label'       => __( 'Whitelist of post types that should be used for linking', 'internal-link-builder' ),
 				'description' => __( 'All posts within the allowed post types can link to other posts automatically.', 'internal-link-builder' ),
 				'default'     => array( 'post', 'page' ),
 				'options'     => array( $this, 'post_type_options' ),
+				'placeholder' => __( 'Type a post type…', 'internal-link-builder' ),
 			),
 			'whitelist_taxonomies'      => array(
-				'type'        => 'multiselect',
+				'type'        => 'token',
+				'token_mode'  => 'static',
+				'token_value' => 'slug',
 				'label'       => __( 'Whitelist of taxonomies that should be used for linking', 'internal-link-builder' ),
 				'description' => __( 'All terms within the allowed taxonomies can link to other posts or terms automatically.', 'internal-link-builder' ),
 				'default'     => array(),
 				'options'     => array( $this, 'taxonomy_options' ),
+				'placeholder' => __( 'Type a taxonomy…', 'internal-link-builder' ),
 			),
 			'blacklist_posts'           => array(
-				'type'        => 'repeatable',
-				'label'       => __( 'Blacklist of posts that should not be used for linking', 'internal-link-builder' ),
-				'description' => __( 'Posts that get configured here do not link to others automatically. Enter one post ID per line.', 'internal-link-builder' ),
-				'default'     => array(),
-				'placeholder' => __( 'Post ID', 'internal-link-builder' ),
+				'type'         => 'token',
+				'token_mode'   => 'ajax',
+				'token_source' => 'post',
+				'token_value'  => 'int',
+				'label'        => __( 'Blacklist of posts that should not be used for linking', 'internal-link-builder' ),
+				'description'  => __( 'Posts that get configured here do not link to others automatically.', 'internal-link-builder' ),
+				'default'      => array(),
+				'placeholder'  => __( 'Type to search posts…', 'internal-link-builder' ),
 			),
 			'blacklist_child_pages'     => array(
 				'type'        => 'toggle',
@@ -167,11 +176,14 @@ class ILB_Settings {
 				'default'     => 0,
 			),
 			'blacklist_terms'           => array(
-				'type'        => 'repeatable',
-				'label'       => __( 'Blacklist of terms that should not be used for linking', 'internal-link-builder' ),
-				'description' => __( 'Terms that get configured here do not link to others automatically. Enter one term ID per line.', 'internal-link-builder' ),
-				'default'     => array(),
-				'placeholder' => __( 'Term ID', 'internal-link-builder' ),
+				'type'         => 'token',
+				'token_mode'   => 'ajax',
+				'token_source' => 'term',
+				'token_value'  => 'int',
+				'label'        => __( 'Blacklist of terms that should not be used for linking', 'internal-link-builder' ),
+				'description'  => __( 'Terms that get configured here do not link to others automatically.', 'internal-link-builder' ),
+				'default'      => array(),
+				'placeholder'  => __( 'Type to search terms…', 'internal-link-builder' ),
 			),
 			'keyword_order'             => array(
 				'type'        => 'select',
@@ -258,23 +270,30 @@ class ILB_Settings {
 				'default'     => 1,
 			),
 			'limiting_taxonomies'       => array(
-				'type'        => 'multiselect',
+				'type'        => 'token',
+				'token_mode'  => 'static',
+				'token_value' => 'slug',
 				'label'       => __( 'Taxonomies that limit linking within their terms', 'internal-link-builder' ),
 				'description' => __( 'Articles within these hierarchical taxonomies link only to articles which have the same category term.', 'internal-link-builder' ),
 				'default'     => array(),
 				'options'     => array( $this, 'hierarchical_taxonomy_options' ),
+				'placeholder' => __( 'Type a taxonomy…', 'internal-link-builder' ),
 			),
 			'post_custom_fields'        => array(
-				'type'        => 'repeatable',
+				'type'        => 'token',
+				'token_mode'  => 'freeform',
+				'token_value' => 'text',
 				'label'       => __( 'Custom fields of posts that get used for linking', 'internal-link-builder' ),
-				'description' => __( 'A list of post custom fields that should be used for automatic linking. Leave empty to not link any custom fields.', 'internal-link-builder' ),
+				'description' => __( 'A list of post custom fields that should be used for automatic linking. Type a meta key and press Enter. Leave empty to not link any custom fields.', 'internal-link-builder' ),
 				'default'     => array(),
 				'placeholder' => __( 'meta_key', 'internal-link-builder' ),
 			),
 			'term_custom_fields'        => array(
-				'type'        => 'repeatable',
+				'type'        => 'token',
+				'token_mode'  => 'freeform',
+				'token_value' => 'text',
 				'label'       => __( 'Custom fields of terms that get used for linking', 'internal-link-builder' ),
-				'description' => __( 'A list of term custom fields that should be used for automatic linking. Leave empty to not link any custom fields.', 'internal-link-builder' ),
+				'description' => __( 'A list of term custom fields that should be used for automatic linking. Type a meta key and press Enter. Leave empty to not link any custom fields.', 'internal-link-builder' ),
 				'default'     => array(),
 				'placeholder' => __( 'meta_key', 'internal-link-builder' ),
 			),
@@ -441,6 +460,10 @@ class ILB_Settings {
 					$clean[ $key ] = $this->sanitize_choices( $value, $field );
 					break;
 
+				case 'token':
+					$clean[ $key ] = $this->sanitize_token( $value, $field );
+					break;
+
 				case 'repeatable':
 					$clean[ $key ] = $this->sanitize_repeatable( $value );
 					break;
@@ -518,6 +541,52 @@ class ILB_Settings {
 		foreach ( $value as $candidate ) {
 			$candidate = sanitize_text_field( (string) $candidate );
 			if ( array_key_exists( $candidate, $options ) ) {
+				$clean[] = $candidate;
+			}
+		}
+
+		return array_values( array_unique( $clean ) );
+	}
+
+	/**
+	 * Sanitizes a token field's array value.
+	 *
+	 * The expected value type is set per field via 'token_value':
+	 *  - int:  list of positive integers (post/term IDs)
+	 *  - slug: list of slugs validated against the field's options
+	 *  - text: list of arbitrary text tokens (e.g. meta keys)
+	 *
+	 * @param mixed $value Raw values.
+	 * @param array $field Field definition.
+	 * @return array
+	 */
+	private function sanitize_token( $value, array $field ) {
+		if ( ! is_array( $value ) ) {
+			return array();
+		}
+
+		$value_type = isset( $field['token_value'] ) ? $field['token_value'] : 'text';
+
+		if ( 'int' === $value_type ) {
+			$clean = array();
+			foreach ( $value as $candidate ) {
+				$id = (int) $candidate;
+				if ( $id > 0 ) {
+					$clean[] = $id;
+				}
+			}
+			return array_values( array_unique( $clean ) );
+		}
+
+		if ( 'slug' === $value_type ) {
+			return $this->sanitize_choices( $value, $field );
+		}
+
+		// Free text.
+		$clean = array();
+		foreach ( $value as $candidate ) {
+			$candidate = sanitize_text_field( (string) $candidate );
+			if ( '' !== $candidate ) {
 				$clean[] = $candidate;
 			}
 		}
