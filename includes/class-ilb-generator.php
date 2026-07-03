@@ -334,6 +334,7 @@ class ILB_Generator {
 	public function ajax_run_generation() {
 		$this->guard_ajax();
 
+		// phpcs:disable WordPress.Security.NonceVerification.Missing -- nonce verified in guard_ajax().
 		$step = isset( $_POST['step'] ) ? sanitize_key( wp_unslash( $_POST['step'] ) ) : 'begin';
 
 		if ( 'begin' === $step ) {
@@ -363,7 +364,8 @@ class ILB_Generator {
 
 		$phase  = ( isset( $_POST['phase'] ) && 'term' === $_POST['phase'] ) ? 'term' : 'post';
 		$offset = isset( $_POST['offset'] ) ? max( 0, (int) $_POST['offset'] ) : 0;
-		$chunk  = self::FOREGROUND_CHUNK;
+		// phpcs:enable WordPress.Security.NonceVerification.Missing
+		$chunk = self::FOREGROUND_CHUNK;
 
 		$processed = ( 'term' === $phase )
 			? $this->process_term_batch( $offset, $chunk )

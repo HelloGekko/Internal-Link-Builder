@@ -27,7 +27,6 @@ jobs:
 
       - name: PHPCS (WordPress standards)
         run: vendor/bin/phpcs -q --report=checkstyle | cs2pr
-        continue-on-error: true
 
   test:
     name: PHPUnit (PHP ${{ matrix.php }}, WP ${{ matrix.wp }})

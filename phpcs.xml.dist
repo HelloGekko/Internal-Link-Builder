@@ -17,9 +17,29 @@
 	<config name="testVersion" value="7.4-"/>
 
 	<rule ref="WordPress">
-		<!-- The plugin uses a single-option store; array keys are fine. -->
+		<!-- The plugin owns two custom tables; direct queries are by design. -->
 		<exclude name="WordPress.DB.DirectDatabaseQuery.DirectQuery"/>
 		<exclude name="WordPress.DB.DirectDatabaseQuery.NoCaching"/>
+		<!--
+			The "ilb"/"ILB" prefix predates this ruleset and is baked into stored
+			data (option keys, meta keys, table names). Renaming it now would
+			break existing installs, so the short-prefix check is disabled as a
+			deliberate, documented exception.
+		-->
+		<exclude name="WordPress.NamingConventions.PrefixAllGlobals.ShortPrefixPassed"/>
+	</rule>
+
+	<rule ref="WordPress.NamingConventions.ValidVariableName">
+		<properties>
+			<!-- PHP DOM extension property names cannot be renamed. -->
+			<property name="allowed_custom_properties" type="array">
+				<element value="nodeValue"/>
+				<element value="nodeName"/>
+				<element value="nodeType"/>
+				<element value="parentNode"/>
+				<element value="childNodes"/>
+			</property>
+		</properties>
 	</rule>
 
 	<rule ref="WordPress.WP.I18n">

@@ -126,13 +126,11 @@ class ILB_Keywords {
 	 * Persists keywords, overrides and the content blacklist for a target, and
 	 * refreshes the index when in automatic mode.
 	 *
-	 * @param int    $target_id        Post or term ID.
-	 * @param string $target_type      'post' or 'term'.
-	 * @param array  $data             {
-	 *     @type string[] $keywords          Keyword strings.
-	 *     @type array    $settings          Override toggles.
-	 *     @type string[] $content_blacklist Keywords not linked in this content.
-	 * }
+	 * @param int    $target_id   Post or term ID.
+	 * @param string $target_type Either 'post' or 'term'.
+	 * @param array  $data        Keyword data: 'keywords' (string[]), 'settings'
+	 *                            (override toggles) and 'content_blacklist'
+	 *                            (string[] of keywords not linked in this content).
 	 * @return void
 	 */
 	public function save( $target_id, $target_type, array $data ) {

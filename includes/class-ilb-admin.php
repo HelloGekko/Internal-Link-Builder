@@ -61,7 +61,7 @@ class ILB_Admin {
 	public function ajax_search_posts() {
 		$this->guard_search();
 
-		$search     = isset( $_GET['q'] ) ? sanitize_text_field( wp_unslash( $_GET['q'] ) ) : '';
+		$search     = isset( $_GET['q'] ) ? sanitize_text_field( wp_unslash( $_GET['q'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- nonce verified in guard_search().
 		$post_types = (array) $this->settings->get( 'whitelist_post_types' );
 		if ( empty( $post_types ) ) {
 			$post_types = get_post_types( array( 'public' => true ) );
@@ -98,7 +98,7 @@ class ILB_Admin {
 	public function ajax_search_terms() {
 		$this->guard_search();
 
-		$search     = isset( $_GET['q'] ) ? sanitize_text_field( wp_unslash( $_GET['q'] ) ) : '';
+		$search     = isset( $_GET['q'] ) ? sanitize_text_field( wp_unslash( $_GET['q'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- nonce verified in guard_search().
 		$taxonomies = (array) $this->settings->get( 'whitelist_taxonomies' );
 		if ( empty( $taxonomies ) ) {
 			$taxonomies = get_taxonomies( array( 'public' => true ) );
@@ -215,9 +215,9 @@ class ILB_Admin {
 			'ilb-admin',
 			'ilbAdmin',
 			array(
-				'ajaxUrl'  => admin_url( 'admin-ajax.php' ),
-				'nonce'    => wp_create_nonce( ILB_Actions::NONCE_ACTION ),
-				'i18n'     => array(
+				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+				'nonce'   => wp_create_nonce( ILB_Actions::NONCE_ACTION ),
+				'i18n'    => array(
 					'confirmCancel' => __( 'Cancel all pending scheduled actions?', 'internal-link-builder' ),
 					'working'       => __( 'Working…', 'internal-link-builder' ),
 					'remove'        => __( 'Remove', 'internal-link-builder' ),

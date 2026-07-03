@@ -187,8 +187,8 @@ final class ILB_Plugin {
 		if ( is_multisite() && $network_wide ) {
 			$site_ids = get_sites(
 				array(
-					'fields'   => 'ids',
-					'number'   => 0,
+					'fields'        => 'ids',
+					'number'        => 0,
 					'no_found_rows' => true,
 				)
 			);

@@ -150,7 +150,7 @@ class ILB_Settings {
 	 */
 	private function content_fields() {
 		return array(
-			'whitelist_post_types'      => array(
+			'whitelist_post_types'        => array(
 				'type'        => 'token',
 				'token_mode'  => 'static',
 				'token_value' => 'slug',
@@ -160,7 +160,7 @@ class ILB_Settings {
 				'options'     => array( $this, 'post_type_options' ),
 				'placeholder' => __( 'Type a post type…', 'internal-link-builder' ),
 			),
-			'whitelist_taxonomies'      => array(
+			'whitelist_taxonomies'        => array(
 				'type'        => 'token',
 				'token_mode'  => 'static',
 				'token_value' => 'slug',
@@ -170,7 +170,7 @@ class ILB_Settings {
 				'options'     => array( $this, 'taxonomy_options' ),
 				'placeholder' => __( 'Type a taxonomy…', 'internal-link-builder' ),
 			),
-			'blacklist_posts'           => array(
+			'blacklist_posts'             => array(
 				'type'         => 'token',
 				'token_mode'   => 'ajax',
 				'token_source' => 'post',
@@ -180,13 +180,13 @@ class ILB_Settings {
 				'default'      => array(),
 				'placeholder'  => __( 'Type to search posts…', 'internal-link-builder' ),
 			),
-			'blacklist_child_pages'     => array(
+			'blacklist_child_pages'       => array(
 				'type'        => 'toggle',
 				'label'       => __( 'Blacklist also child pages of blacklisted pages', 'internal-link-builder' ),
 				'description' => '',
 				'default'     => 0,
 			),
-			'blacklist_terms'           => array(
+			'blacklist_terms'             => array(
 				'type'         => 'token',
 				'token_mode'   => 'ajax',
 				'token_source' => 'term',
@@ -196,20 +196,20 @@ class ILB_Settings {
 				'default'      => array(),
 				'placeholder'  => __( 'Type to search terms…', 'internal-link-builder' ),
 			),
-			'keyword_order'             => array(
+			'keyword_order'               => array(
 				'type'        => 'select',
 				'label'       => __( 'Order for configured keywords while linking', 'internal-link-builder' ),
 				'description' => __( 'Set the order of how your set keywords get used for building links.', 'internal-link-builder' ),
 				'default'     => 'first_configured',
 				'options'     => array(
-					'first_configured'  => __( 'First configured keyword gets linked first', 'internal-link-builder' ),
+					'first_configured'   => __( 'First configured keyword gets linked first', 'internal-link-builder' ),
 					'highest_word_count' => __( 'Highest word count gets linked first', 'internal-link-builder' ),
 					'lowest_word_count'  => __( 'Lowest word count gets linked first', 'internal-link-builder' ),
 					'highest_char_count' => __( 'Highest character count gets linked first', 'internal-link-builder' ),
 					'lowest_char_count'  => __( 'Lowest character count gets linked first', 'internal-link-builder' ),
 				),
 			),
-			'max_links_per_post'        => array(
+			'max_links_per_post'          => array(
 				'type'        => 'number',
 				'label'       => __( 'Maximum amount of links per post', 'internal-link-builder' ),
 				'description' => __( 'For an unlimited number of links, set this value to 0.', 'internal-link-builder' ),
@@ -217,13 +217,13 @@ class ILB_Settings {
 				'min'         => 0,
 				'step'        => 1,
 			),
-			'limit_links_per_paragraph' => array(
+			'limit_links_per_paragraph'   => array(
 				'type'        => 'toggle',
 				'label'       => __( 'Limit links per paragraph', 'internal-link-builder' ),
 				'description' => __( 'Limit the links created per paragraph.', 'internal-link-builder' ),
 				'default'     => 0,
 			),
-			'max_links_per_paragraph'   => array(
+			'max_links_per_paragraph'     => array(
 				'type'        => 'number',
 				'label'       => __( 'Maximum amount of links per paragraph', 'internal-link-builder' ),
 				'description' => __( 'Set the maximum links per paragraph.', 'internal-link-builder' ),
@@ -232,7 +232,7 @@ class ILB_Settings {
 				'step'        => 1,
 				'depends_on'  => 'limit_links_per_paragraph',
 			),
-			'max_link_frequency'        => array(
+			'max_link_frequency'          => array(
 				'type'        => 'number',
 				'label'       => __( 'Maximum frequency of how often a post gets linked within another one', 'internal-link-builder' ),
 				'description' => __( 'For an unlimited number of links, set this value to 0.', 'internal-link-builder' ),
@@ -240,13 +240,13 @@ class ILB_Settings {
 				'min'         => 0,
 				'step'        => 1,
 			),
-			'limit_incoming_links'      => array(
+			'limit_incoming_links'        => array(
 				'type'        => 'toggle',
 				'label'       => __( 'Limit incoming links', 'internal-link-builder' ),
 				'description' => __( 'Globally set a limit for all posts/pages/terms on the number of incoming links each can have.', 'internal-link-builder' ),
 				'default'     => 0,
 			),
-			'max_incoming_links'        => array(
+			'max_incoming_links'          => array(
 				'type'        => 'number',
 				'label'       => __( 'Maximum incoming links', 'internal-link-builder' ),
 				'description' => __( 'The maximum number of links each post/page/term can have from other posts/pages/terms.', 'internal-link-builder' ),
@@ -255,32 +255,32 @@ class ILB_Settings {
 				'step'        => 1,
 				'depends_on'  => 'limit_incoming_links',
 			),
-			'link_as_often_as_possible' => array(
+			'link_as_often_as_possible'   => array(
 				'type'        => 'toggle',
 				'label'       => __( 'Link as often as possible', 'internal-link-builder' ),
 				'description' => __( 'Allows posts and keywords to get linked as often as possible. Deactivates all other restrictions.', 'internal-link-builder' ),
 				'default'     => 0,
 			),
-			'case_sensitive'            => array(
+			'case_sensitive'              => array(
 				'type'        => 'toggle',
 				'label'       => __( 'Case sensitive mode', 'internal-link-builder' ),
 				'description' => __( 'When this mode is on, keywords will be matched considering their case.', 'internal-link-builder' ),
 				'default'     => 0,
 			),
-			'exclude_html_areas'        => array(
+			'exclude_html_areas'          => array(
 				'type'        => 'multicheck',
 				'label'       => __( 'Exclude HTML areas from linking', 'internal-link-builder' ),
 				'description' => __( 'Content within the HTML tags configured here does not get used for linking.', 'internal-link-builder' ),
 				'default'     => array( 'headlines', 'strong' ),
 				'options'     => self::html_area_options(),
 			),
-			'consider_existing_links'   => array(
+			'consider_existing_links'     => array(
 				'type'        => 'toggle',
 				'label'       => __( 'Consideration of existing or manually created links', 'internal-link-builder' ),
 				'description' => __( 'Do not link already manually built link targets. Prevents links to URLs that are already linked in the content.', 'internal-link-builder' ),
 				'default'     => 1,
 			),
-			'limiting_taxonomies'       => array(
+			'limiting_taxonomies'         => array(
 				'type'        => 'token',
 				'token_mode'  => 'static',
 				'token_value' => 'slug',
@@ -296,7 +296,7 @@ class ILB_Settings {
 				'description' => __( 'Advanced: when enabled, the values of the custom fields configured below are filtered on the front end to inject links. Only enable this for fields whose value is displayed as text. Fields used for other purposes (URLs, CSS classes, numbers, internal data) can break your theme or other plugins.', 'internal-link-builder' ),
 				'default'     => 0,
 			),
-			'post_custom_fields'        => array(
+			'post_custom_fields'          => array(
 				'type'        => 'token',
 				'token_mode'  => 'freeform',
 				'token_value' => 'text',
@@ -306,7 +306,7 @@ class ILB_Settings {
 				'placeholder' => __( 'meta_key', 'internal-link-builder' ),
 				'depends_on'  => 'enable_custom_field_linking',
 			),
-			'term_custom_fields'        => array(
+			'term_custom_fields'          => array(
 				'type'        => 'token',
 				'token_mode'  => 'freeform',
 				'token_value' => 'text',
@@ -435,18 +435,18 @@ class ILB_Settings {
 	/**
 	 * Returns a single setting value.
 	 *
-	 * @param string $key     Setting key.
-	 * @param mixed  $default Fallback when the key is unknown.
+	 * @param string $key      Setting key.
+	 * @param mixed  $fallback Fallback when the key is unknown.
 	 * @return mixed
 	 */
-	public function get( $key, $default = null ) {
+	public function get( $key, $fallback = null ) {
 		$all = $this->all();
 
 		if ( array_key_exists( $key, $all ) ) {
 			return $all[ $key ];
 		}
 
-		return $default;
+		return $fallback;
 	}
 
 	/*
@@ -718,17 +718,17 @@ class ILB_Settings {
 	 */
 	public static function html_area_options() {
 		return array(
-			'headlines'   => __( 'Headlines (<h1>-<h6>)', 'internal-link-builder' ),
-			'strong'      => __( 'Strong text (<strong>, <b>)', 'internal-link-builder' ),
-			'div'         => __( 'Div container (<div>)', 'internal-link-builder' ),
-			'table'       => __( 'Tables (<table>)', 'internal-link-builder' ),
-			'figcaption'  => __( 'Image captions (<figcaption>)', 'internal-link-builder' ),
-			'ol'          => __( 'Ordered lists (<ol>)', 'internal-link-builder' ),
-			'ul'          => __( 'Unordered lists (<ul>)', 'internal-link-builder' ),
-			'blockquote'  => __( 'Blockquotes (<blockquote>)', 'internal-link-builder' ),
-			'em'          => __( 'Italic text (<em>, <i>)', 'internal-link-builder' ),
-			'cite'        => __( 'Inline quotes (<cite>)', 'internal-link-builder' ),
-			'code'        => __( 'Sourcecode (<code>)', 'internal-link-builder' ),
+			'headlines'  => __( 'Headlines (<h1>-<h6>)', 'internal-link-builder' ),
+			'strong'     => __( 'Strong text (<strong>, <b>)', 'internal-link-builder' ),
+			'div'        => __( 'Div container (<div>)', 'internal-link-builder' ),
+			'table'      => __( 'Tables (<table>)', 'internal-link-builder' ),
+			'figcaption' => __( 'Image captions (<figcaption>)', 'internal-link-builder' ),
+			'ol'         => __( 'Ordered lists (<ol>)', 'internal-link-builder' ),
+			'ul'         => __( 'Unordered lists (<ul>)', 'internal-link-builder' ),
+			'blockquote' => __( 'Blockquotes (<blockquote>)', 'internal-link-builder' ),
+			'em'         => __( 'Italic text (<em>, <i>)', 'internal-link-builder' ),
+			'cite'       => __( 'Inline quotes (<cite>)', 'internal-link-builder' ),
+			'code'       => __( 'Sourcecode (<code>)', 'internal-link-builder' ),
 		);
 	}
 

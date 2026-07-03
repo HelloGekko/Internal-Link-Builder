@@ -276,7 +276,7 @@ class ILB_Metabox {
 			return;
 		}
 
-		$raw = isset( $_POST['ilb_meta'] ) ? wp_unslash( $_POST['ilb_meta'] ) : array(); // phpcs:ignore WordPress.Security.ValidationSanitization.InputNotSanitized -- sanitised in ILB_Keywords::save().
+		$raw = isset( $_POST['ilb_meta'] ) ? wp_unslash( $_POST['ilb_meta'] ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- sanitised in ILB_Keywords::save().
 
 		$this->keywords->save(
 			$post_id,

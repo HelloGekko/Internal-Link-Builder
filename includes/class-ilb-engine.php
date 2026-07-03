@@ -741,7 +741,7 @@ class ILB_Engine {
 		$dom  = new DOMDocument();
 		$prev = libxml_use_internal_errors( true );
 		$ok   = $dom->loadHTML(
-			'<?xml encoding="UTF-8">' . '<div id="ilb-root">' . $content . '</div>',
+			'<?xml encoding="UTF-8"><div id="ilb-root">' . $content . '</div>',
 			LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD
 		);
 		libxml_clear_errors();
@@ -959,13 +959,13 @@ class ILB_Engine {
 			}
 		);
 
-		$total             = 0;
-		$per_paragraph     = array();
-		$per_target_para   = array();
-		$per_target        = array();
-		$used_urls         = $existing_urls;
-		$accepted          = array();
-		$source_terms      = $this->source_terms( $source );
+		$total           = 0;
+		$per_paragraph   = array();
+		$per_target_para = array();
+		$per_target      = array();
+		$used_urls       = $existing_urls;
+		$accepted        = array();
+		$source_terms    = $this->source_terms( $source );
 
 		foreach ( $placements as $placement ) {
 			if ( $max_post > 0 && $total >= $max_post ) {
@@ -1003,8 +1003,8 @@ class ILB_Engine {
 				'target' => $target,
 			);
 
-			$total++;
-			$per_target[ $key ] = isset( $per_target[ $key ] ) ? $per_target[ $key ] + 1 : 1;
+			++$total;
+			$per_target[ $key ]                                  = isset( $per_target[ $key ] ) ? $per_target[ $key ] + 1 : 1;
 			$used_urls[ $this->normalize_url( $target['url'] ) ] = true;
 			if ( $limit_para ) {
 				$per_paragraph[ $para ] = isset( $per_paragraph[ $para ] ) ? $per_paragraph[ $para ] + 1 : 1;
@@ -1320,7 +1320,7 @@ class ILB_Engine {
 		$fragment = new DOMDocument();
 		$prev     = libxml_use_internal_errors( true );
 		$fragment->loadHTML(
-			'<?xml encoding="UTF-8">' . '<div id="ilb-a">' . $html . '</div>',
+			'<?xml encoding="UTF-8"><div id="ilb-a">' . $html . '</div>',
 			LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD
 		);
 		libxml_clear_errors();

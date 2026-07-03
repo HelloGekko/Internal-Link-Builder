@@ -106,7 +106,7 @@ class ILB_Index {
 
 		$table = self::table_name();
 		// Table name cannot be parameterised; it is built from $wpdb->prefix.
-		$wpdb->query( "DROP TABLE IF EXISTS {$table}" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$wpdb->query( "DROP TABLE IF EXISTS {$table}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.SchemaChange -- table name from $wpdb->prefix; plugin-owned table cleanup.
 		delete_option( self::DB_VERSION_OPTION );
 	}
 
@@ -214,7 +214,7 @@ class ILB_Index {
 		$table = self::table_name();
 
 		return $wpdb->get_results(
-			"SELECT keyword, keyword_lower, target_id, target_type FROM {$table} ORDER BY id ASC", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+			"SELECT keyword, keyword_lower, target_id, target_type FROM {$table} ORDER BY id ASC", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name from $wpdb->prefix.
 			ARRAY_A
 		);
 	}
@@ -229,6 +229,6 @@ class ILB_Index {
 
 		$table = self::table_name();
 
-		return (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table}" ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		return (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name from $wpdb->prefix.
 	}
 }

@@ -4,7 +4,7 @@ Tags: internal links, seo, automatic linking, interlinking, keywords
 Requires at least: 5.8
 Tested up to: 6.5
 Requires PHP: 7.4
-Stable tag: 0.8.0
+Stable tag: 0.8.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -44,6 +44,13 @@ with a progress indicator, and an optional advanced custom-field linking mode.
    limits. The original content in the database is never changed.
 
 == Changelog ==
+
+= 0.8.1 =
+* Code quality: the full codebase now passes WordPress Coding Standards (PHPCS)
+  with zero errors and warnings, and the PHPCS check in CI is blocking.
+* Fix two phpcs:ignore comments that referenced a wrong sniff name, so the
+  intended sanitization annotations are actually honoured.
+* Rename a reserved-keyword parameter and merge unnecessary string concats.
 
 = 0.8.0 =
 * Add a schema-version upgrade routine so plugin updates create/upgrade tables
