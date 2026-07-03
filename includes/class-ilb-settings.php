@@ -316,6 +316,20 @@ class ILB_Settings {
 				'placeholder' => __( 'meta_key', 'internal-link-builder' ),
 				'depends_on'  => 'enable_custom_field_linking',
 			),
+			'enable_acf_linking'          => array(
+				'type'        => 'toggle',
+				'label'       => __( 'Link keywords in ACF fields', 'internal-link-builder' ),
+				'description' => __( 'Requires Advanced Custom Fields. Links keywords inside the values of the selected ACF field types when they are displayed — including fields inside repeaters, groups and flexible content. Only enable field types whose values are shown as text; fields used inside HTML attributes should not be linked.', 'internal-link-builder' ),
+				'default'     => 0,
+			),
+			'acf_field_types'             => array(
+				'type'        => 'multicheck',
+				'label'       => __( 'ACF field types that get linked', 'internal-link-builder' ),
+				'description' => __( 'Keywords are only linked inside these ACF field types.', 'internal-link-builder' ),
+				'default'     => array( 'textarea', 'wysiwyg' ),
+				'options'     => array( 'ILB_ACF', 'field_type_options' ),
+				'depends_on'  => 'enable_acf_linking',
+			),
 		);
 	}
 

@@ -640,6 +640,35 @@ class ILB_Engine {
 	 */
 
 	/**
+	 * Public entry point for linking an arbitrary piece of content that belongs
+	 * to a source (used by integrations such as the ACF bridge).
+	 *
+	 * Applies the same source-eligibility checks and limit pipeline as the
+	 * built-in the_content handling.
+	 *
+	 * @param string $content     Content to process (plain text or HTML).
+	 * @param int    $source_id   Source object ID.
+	 * @param string $source_type Either 'post' or 'term'.
+	 * @return string
+	 */
+	public function link_source_content( $content, $source_id, $source_type ) {
+		if ( ! is_string( $content ) || '' === trim( $content ) ) {
+			return $content;
+		}
+
+		$source = array(
+			'id'   => (int) $source_id,
+			'type' => ( 'term' === $source_type ) ? 'term' : 'post',
+		);
+
+		if ( ! $this->is_source_allowed( $source ) ) {
+			return $content;
+		}
+
+		return $this->link_html( $content, $source );
+	}
+
+	/**
 	 * Returns the content with generated links applied (or unchanged).
 	 *
 	 * @param string $content Content to process.

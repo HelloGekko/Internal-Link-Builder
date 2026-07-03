@@ -4,7 +4,7 @@ Tags: internal links, seo, automatic linking, interlinking, keywords
 Requires at least: 5.8
 Tested up to: 6.5
 Requires PHP: 7.4
-Stable tag: 0.8.1
+Stable tag: 0.9.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -19,7 +19,9 @@ the fly, without modifying your stored content.
 
 The plugin includes the settings screen, keyword index, per-post and per-term
 keyword configuration, the front-end linking engine, a batched index generator
-with a progress indicator, and an optional advanced custom-field linking mode.
+with a progress indicator, native Advanced Custom Fields support (text,
+textarea and WYSIWYG fields, including repeaters/groups/flexible content) and
+an optional advanced custom-field linking mode for non-ACF meta.
 
 = Settings overview =
 
@@ -44,6 +46,17 @@ with a progress indicator, and an optional advanced custom-field linking mode.
    limits. The original content in the database is never changed.
 
 == Changelog ==
+
+= 0.9.0 =
+* Native Advanced Custom Fields integration: link keywords inside ACF field
+  values via ACF's own acf/format_value filters, selected by field TYPE (text,
+  textarea, WYSIWYG) — fields inside repeaters, groups and flexible content
+  work automatically, on posts and terms.
+* New Content-tab settings: "Link keywords in ACF fields" toggle and the field
+  types to link (default: textarea and WYSIWYG). Per-field opt-out via the
+  ilb_acf_link_field filter.
+* New public engine entry point (link_source_content) for integrations, with
+  the same eligibility checks and limits as regular content.
 
 = 0.8.1 =
 * Code quality: the full codebase now passes WordPress Coding Standards (PHPCS)
