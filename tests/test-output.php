@@ -14,6 +14,13 @@ class Test_ILB_Output extends WP_UnitTestCase {
 	 */
 	private $target_id;
 
+	/**
+	 * Second target post, for the builder-block keyword.
+	 *
+	 * @var int
+	 */
+	private $target_two_id;
+
 	public function set_up() {
 		parent::set_up();
 
@@ -34,17 +41,28 @@ class Test_ILB_Output extends WP_UnitTestCase {
 			)
 		);
 		ilb()->keywords->save( $this->target_id, 'post', array( 'keywords' => array( 'druif' ) ) );
+
+		$this->target_two_id = self::factory()->post->create(
+			array(
+				'post_status'  => 'publish',
+				'post_title'   => 'Target two',
+				'post_content' => 'Second target content.',
+			)
+		);
+		ilb()->keywords->save( $this->target_two_id, 'post', array( 'keywords' => array( 'vijg' ) ) );
 	}
 
 	/**
-	 * Builds a full page document with the keyword in several regions.
+	 * Builds a full page document with keywords in several regions. The main
+	 * region carries two different keywords (each target is only ever linked
+	 * once per page); page chrome repeats the first keyword.
 	 *
 	 * @return string
 	 */
 	private function page_html() {
 		return '<!DOCTYPE html><html><head><title>druif in title</title></head><body>'
 			. '<nav><span>druif in nav</span></nav>'
-			. '<main><p>Een tros druif in de hoofdcontent.</p><div class="builder-block"><p>Nog een druif uit de page builder.</p></div></main>'
+			. '<main><p>Een tros druif in de hoofdcontent.</p><div class="builder-block"><p>Een vijg uit de page builder.</p></div></main>'
 			. '<footer><p>druif in footer</p></footer>'
 			. '</body></html>';
 	}
@@ -60,10 +78,9 @@ class Test_ILB_Output extends WP_UnitTestCase {
 			)
 		);
 
-		$url = get_permalink( $this->target_id );
-
-		// Linked inside <main>, including the builder markup.
-		$this->assertSame( 2, substr_count( $out, 'href="' . $url . '"' ) );
+		// Both keywords linked inside <main>, including the builder markup.
+		$this->assertSame( 1, substr_count( $out, 'href="' . get_permalink( $this->target_id ) . '"' ) );
+		$this->assertSame( 1, substr_count( $out, 'href="' . get_permalink( $this->target_two_id ) . '"' ) );
 
 		// Chrome stays untouched.
 		$this->assertStringContainsString( '<title>druif in title</title>', $out );
@@ -101,8 +118,10 @@ class Test_ILB_Output extends WP_UnitTestCase {
 			ILB_Output::selectors_to_xpaths( '.builder-block' )
 		);
 
-		// Only the builder block is processed, so exactly one link.
-		$this->assertSame( 1, substr_count( $out, 'href="' . get_permalink( $this->target_id ) . '"' ) );
+		// Only the builder block is processed: its keyword links, the one in
+		// the main paragraph outside the region does not.
+		$this->assertSame( 1, substr_count( $out, 'href="' . get_permalink( $this->target_two_id ) . '"' ) );
+		$this->assertSame( 0, substr_count( $out, 'href="' . get_permalink( $this->target_id ) . '"' ) );
 	}
 
 	public function test_selectors_to_xpaths_conversion() {

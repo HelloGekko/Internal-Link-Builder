@@ -38,6 +38,7 @@
 				<element value="nodeType"/>
 				<element value="parentNode"/>
 				<element value="childNodes"/>
+				<element value="documentElement"/>
 			</property>
 		</properties>
 	</rule>
