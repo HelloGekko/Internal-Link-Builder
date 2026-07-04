@@ -99,14 +99,7 @@ final class ILB_Plugin {
 	public $generator;
 
 	/**
-	 * Advanced Custom Fields integration.
-	 *
-	 * @var ILB_ACF
-	 */
-	public $acf;
-
-	/**
-	 * Universal (whole-page) output processing.
+	 * Front-end page processing (output buffering).
 	 *
 	 * @var ILB_Output
 	 */
@@ -149,7 +142,6 @@ final class ILB_Plugin {
 		require_once ILB_PLUGIN_DIR . 'includes/class-ilb-links.php';
 		require_once ILB_PLUGIN_DIR . 'includes/class-ilb-keywords.php';
 		require_once ILB_PLUGIN_DIR . 'includes/class-ilb-engine.php';
-		require_once ILB_PLUGIN_DIR . 'includes/class-ilb-acf.php';
 		require_once ILB_PLUGIN_DIR . 'includes/class-ilb-output.php';
 		require_once ILB_PLUGIN_DIR . 'includes/class-ilb-generator.php';
 		require_once ILB_PLUGIN_DIR . 'includes/class-ilb-admin-bar.php';
@@ -175,9 +167,6 @@ final class ILB_Plugin {
 		$this->engine    = new ILB_Engine( $this->settings, $this->index, $this->keywords, $this->links );
 		$this->generator = new ILB_Generator( $this->settings, $this->engine, $this->links );
 		$this->generator->hooks();
-
-		$this->acf = new ILB_ACF( $this->settings, $this->engine );
-		$this->acf->hooks();
 
 		$this->output = new ILB_Output( $this->settings, $this->engine );
 		$this->output->hooks();

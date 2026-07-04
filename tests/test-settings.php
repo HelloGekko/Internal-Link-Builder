@@ -56,8 +56,7 @@ class Test_ILB_Settings extends WP_UnitTestCase {
 			'_tab'                 => 'content',
 			'whitelist_post_types' => array( 'post', 'does-not-exist' ),
 			'blacklist_posts'      => array( '12', 'abc', '0', '12' ),
-			'post_custom_fields'   => array( ' my_key ', '', 'my_key' ),
-			'enable_custom_field_linking' => '1',
+			'universal_selector'   => '  main, #content  ',
 		);
 
 		$clean = $this->settings->sanitize( $input );
@@ -66,8 +65,8 @@ class Test_ILB_Settings extends WP_UnitTestCase {
 		$this->assertSame( array( 'post' ), $clean['whitelist_post_types'] );
 		// Ints filtered, deduped, zero dropped.
 		$this->assertSame( array( 12 ), $clean['blacklist_posts'] );
-		// Free text trimmed, empties dropped, deduped.
-		$this->assertSame( array( 'my_key' ), $clean['post_custom_fields'] );
+		// Plain text trimmed.
+		$this->assertSame( 'main, #content', $clean['universal_selector'] );
 	}
 
 	public function test_number_clamping() {

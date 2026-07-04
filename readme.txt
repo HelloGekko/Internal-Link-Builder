@@ -4,7 +4,7 @@ Tags: internal links, seo, automatic linking, interlinking, keywords
 Requires at least: 5.8
 Tested up to: 6.5
 Requires PHP: 7.4
-Stable tag: 0.10.0
+Stable tag: 0.11.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -17,35 +17,46 @@ want to *receive* internal links. Whenever those keywords appear in the content
 of other posts, the plugin turns them into links to the configured target — on
 the fly, without modifying your stored content.
 
-The plugin includes the settings screen, keyword index, per-post and per-term
-keyword configuration, the front-end linking engine, a batched index generator
-with a progress indicator, native Advanced Custom Fields support (text,
-textarea and WYSIWYG fields, including repeaters/groups/flexible content) and
-an optional advanced custom-field linking mode for non-ACF meta.
+The plugin processes the final rendered HTML of each page, so keywords are
+linked no matter how the content is produced — the block editor, the classic
+editor, page builders, ACF fields, shortcodes or widgets. Only the content
+region is processed; navigation, header, footer and forms are never touched.
 
 = Settings overview =
 
 * **General** — data retention on uninstall, admin bar indicator, Action
   Scheduler batch size, minimum role for editing keywords, and index generation
   mode.
-* **Content** — post type / taxonomy whitelists, post / term blacklists, keyword
-  ordering, link limits (per post, per paragraph, incoming, frequency), case
-  sensitivity, excluded HTML areas, limiting taxonomies and custom fields.
+* **Content** — the content region, post type / taxonomy whitelists, post /
+  term blacklists, keyword ordering, link limits (per post, per paragraph,
+  incoming, frequency), case sensitivity, excluded HTML areas and limiting
+  taxonomies.
 * **Links** — the output template (with {{url}}, {{anchor}}, {{excerpt}} and
   {{title}} placeholders) and the nofollow toggle.
-* **Actions** — output cache, cancel pending schedules and a collation repair
-  tool.
+* **Actions** — index status with progress, cancel pending schedules and a
+  collation repair tool.
 
 == How linking works ==
 
 1. You configure keywords on a *target* (the post/page/term you want links to
    point to), via the post metabox or the term edit screen.
 2. The plugin builds an index that maps each keyword to its target.
-3. When any other post is rendered, its content is scanned for those keywords
-   and matches are replaced with a link to the target, applying all configured
-   limits. The original content in the database is never changed.
+3. When any other page is rendered, the plugin scans the content region of the
+   finished page for those keywords and replaces matches with a link to the
+   target, applying all configured limits. The original content in the
+   database is never changed.
 
 == Changelog ==
+
+= 0.11.0 =
+* Simplification: whole-page processing is now THE way the plugin works — no
+  processing-mode choice, no separate ACF or custom-field options. Keywords are
+  linked in the rendered content region of every page, whatever produced it.
+* Removed: the Standard/Universal mode selector, the ACF integration settings,
+  the custom-field meta linking settings and the output-cache toggle (page
+  caching plugins cover caching). The "Content region" setting remains for
+  themes where auto-detection needs a hint.
+* Existing keyword configuration and all limits keep working unchanged.
 
 = 0.10.0 =
 * New "Universal" processing mode: the plugin buffers the final rendered HTML

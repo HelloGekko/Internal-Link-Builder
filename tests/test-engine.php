@@ -112,4 +112,29 @@ class Test_ILB_Engine extends WP_UnitTestCase {
 		$this->assertCount( 0, $links );
 		unset( $target_id );
 	}
+
+	public function test_link_source_content_links_keyword_in_html_snippet() {
+		$target_id = $this->make_target( array( 'kiwi' ) );
+
+		$source_id = self::factory()->post->create( array( 'post_status' => 'publish' ) );
+
+		$html = ilb()->engine->link_source_content( '<p>Verse kiwi uit de tuin.</p>', $source_id, 'post' );
+
+		$this->assertStringContainsString( 'href="' . get_permalink( $target_id ) . '"', $html );
+		$this->assertStringContainsString( '>kiwi</a>', $html );
+	}
+
+	public function test_link_source_content_respects_blacklisted_source() {
+		$this->make_target( array( 'papaja' ) );
+
+		$source_id = self::factory()->post->create( array( 'post_status' => 'publish' ) );
+
+		$settings                         = ILB_Settings::defaults();
+		$settings['whitelist_post_types'] = array( 'post', 'page' );
+		$settings['blacklist_posts']      = array( $source_id );
+		update_option( ILB_SETTINGS_OPTION, $settings );
+
+		$value = '<p>Een rijpe papaja.</p>';
+		$this->assertSame( $value, ilb()->engine->link_source_content( $value, $source_id, 'post' ) );
+	}
 }

@@ -668,25 +668,7 @@ class ILB_Admin {
 	 * Renders the Actions tab (maintenance tools, not stored fields).
 	 */
 	private function render_actions_tab() {
-		$cache_field = $this->settings->action_fields()['cache'];
-		$cache_value = $this->settings->get( 'cache' );
 		?>
-		<form method="post" action="options.php" class="ilb-form">
-			<?php
-			settings_fields( ILB_Settings::OPTION_GROUP );
-			printf(
-				'<input type="hidden" name="%s[_tab]" value="actions" />',
-				esc_attr( ILB_SETTINGS_OPTION )
-			);
-			?>
-			<table class="form-table ilb-form-table" role="presentation"><tbody>
-				<?php $this->render_field_row( 'cache', $cache_field, array( 'cache' => $cache_value ) ); ?>
-			</tbody></table>
-			<?php submit_button(); ?>
-		</form>
-
-		<hr />
-
 		<h2><?php esc_html_e( 'Index status', 'internal-link-builder' ); ?></h2>
 		<div class="ilb-index-status" data-running="<?php echo esc_attr( $this->is_generation_running() ? '1' : '0' ); ?>">
 			<p class="ilb-index-counts">

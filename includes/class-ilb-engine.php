@@ -1,10 +1,11 @@
 <?php
 /**
- * Front-end linking engine.
+ * Linking engine.
  *
- * Turns configured keywords into links to their target, on the fly, in post
- * content, term descriptions and (optionally) selected custom fields. The stored
- * content is never modified.
+ * Turns configured keywords into links to their target inside rendered HTML.
+ * The front-end entry point is ILB_Output, which buffers the final page and
+ * calls link_document(); the generator uses compute_links() to build the link
+ * graph. The stored content is never modified.
  *
  * Parsing is done with DOMDocument so replacements only ever happen inside text
  * nodes — never inside tags, attributes, existing links or excluded HTML areas.
@@ -21,11 +22,6 @@ defined( 'ABSPATH' ) || exit;
  * Class ILB_Engine
  */
 class ILB_Engine {
-
-	/**
-	 * Meta key for the cached link output.
-	 */
-	const CACHE_META = '_ilb_link_cache';
 
 	/**
 	 * Settings handler.
@@ -84,13 +80,6 @@ class ILB_Engine {
 	private $base_token = null;
 
 	/**
-	 * Re-entrancy guard for the custom-field meta filters.
-	 *
-	 * @var bool
-	 */
-	private $meta_guard = false;
-
-	/**
 	 * Constructor.
 	 *
 	 * @param ILB_Settings $settings Settings handler.
@@ -103,35 +92,7 @@ class ILB_Engine {
 		$this->index    = $index;
 		$this->keywords = $keywords;
 		$this->links    = $links;
-
-		// In universal mode the whole page output is processed by ILB_Output, so
-		// the per-source content filters would only duplicate work.
-		if ( 'universal' === $this->settings->get( 'processing_mode' ) ) {
-			return;
-		}
-
-		// Run after wpautop (priority 10) so paragraphs exist as <p> elements.
-		add_filter( 'the_content', array( $this, 'filter_content' ), 20 );
-		add_filter( 'get_the_archive_description', array( $this, 'filter_term_description' ), 20 );
-
-		// Custom-field linking is an opt-in advanced feature. Only hook the (hot)
-		// meta filters when explicitly enabled AND fields are configured, to
-		// avoid both site-wide overhead and accidental breakage.
-		if ( $this->settings->get( 'enable_custom_field_linking' ) ) {
-			if ( ! empty( (array) $this->settings->get( 'post_custom_fields' ) ) ) {
-				add_filter( 'get_post_metadata', array( $this, 'filter_post_meta' ), 20, 4 );
-			}
-			if ( ! empty( (array) $this->settings->get( 'term_custom_fields' ) ) ) {
-				add_filter( 'get_term_metadata', array( $this, 'filter_term_meta' ), 20, 4 );
-			}
-		}
 	}
-
-	/*
-	 * -------------------------------------------------------------------------
-	 * Front-end filters
-	 * -------------------------------------------------------------------------
-	 */
 
 	/**
 	 * Clears the engine's per-request caches.
@@ -144,200 +105,6 @@ class ILB_Engine {
 		$this->base_token      = null;
 		$this->target_cache    = array();
 		$this->override_cache  = array();
-	}
-
-	/**
-	 * The `the_content` filter entry point.
-	 *
-	 * @param string $content Post content.
-	 * @return string
-	 */
-	public function filter_content( $content ) {
-		if ( is_admin() || is_feed() || '' === trim( (string) $content ) ) {
-			return $content;
-		}
-
-		/**
-		 * Filters whether the engine should process the current the_content call.
-		 *
-		 * Defaults to singular, main-query, in-the-loop content. Themes (e.g.
-		 * some block/FSE setups) can override this to widen or narrow coverage.
-		 *
-		 * @param bool $should_link Whether to inject links here.
-		 */
-		$should_link = is_singular() && in_the_loop() && is_main_query();
-		if ( ! apply_filters( 'ilb_should_link_content', $should_link ) ) {
-			return $content;
-		}
-
-		$post = get_post();
-		if ( ! $post instanceof WP_Post || ! $this->is_post_source_allowed( $post ) ) {
-			return $content;
-		}
-
-		$source = array(
-			'id'   => (int) $post->ID,
-			'type' => 'post',
-		);
-
-		// Serve from cache when enabled and fresh.
-		$use_cache   = (bool) $this->settings->get( 'cache' );
-		$fingerprint = '';
-		if ( $use_cache ) {
-			$fingerprint = $this->fingerprint( $content, $post->ID );
-			$cached      = get_post_meta( $post->ID, self::CACHE_META, true );
-			if ( is_array( $cached ) && isset( $cached['key'] ) && $cached['key'] === $fingerprint ) {
-				return $cached['html'];
-			}
-		}
-
-		$result = $this->link_html( $content, $source );
-
-		if ( $use_cache ) {
-			update_post_meta(
-				$post->ID,
-				self::CACHE_META,
-				array(
-					'key'  => $fingerprint,
-					'html' => $result,
-				)
-			);
-		}
-
-		return $result;
-	}
-
-	/**
-	 * Links keywords inside a term archive description.
-	 *
-	 * @param string $description Archive description HTML.
-	 * @return string
-	 */
-	public function filter_term_description( $description ) {
-		if ( is_admin() || '' === trim( (string) $description ) ) {
-			return $description;
-		}
-
-		$term = get_queried_object();
-		if ( ! $term instanceof WP_Term || ! $this->is_term_source_allowed( $term ) ) {
-			return $description;
-		}
-
-		return $this->link_html(
-			$description,
-			array(
-				'id'   => (int) $term->term_id,
-				'type' => 'term',
-			)
-		);
-	}
-
-	/**
-	 * Links keywords inside selected post custom fields on display.
-	 *
-	 * Only the meta keys configured under "Custom fields of posts that get used
-	 * for linking" are affected, and only on front-end page views. Returns null
-	 * to let WordPress read the value normally when nothing should change.
-	 *
-	 * @param mixed  $value     Short-circuit value (null by default).
-	 * @param int    $object_id Post ID.
-	 * @param string $meta_key  Meta key.
-	 * @param bool   $single    Whether a single value was requested.
-	 * @return mixed
-	 */
-	public function filter_post_meta( $value, $object_id, $meta_key, $single ) {
-		return $this->filter_object_meta( $value, $object_id, $meta_key, $single, 'post' );
-	}
-
-	/**
-	 * Links keywords inside selected term custom fields on display.
-	 *
-	 * @param mixed  $value     Short-circuit value (null by default).
-	 * @param int    $object_id Term ID.
-	 * @param string $meta_key  Meta key.
-	 * @param bool   $single    Whether a single value was requested.
-	 * @return mixed
-	 */
-	public function filter_term_meta( $value, $object_id, $meta_key, $single ) {
-		return $this->filter_object_meta( $value, $object_id, $meta_key, $single, 'term' );
-	}
-
-	/**
-	 * Shared custom-field meta filter for posts and terms.
-	 *
-	 * @param mixed  $value     Short-circuit value.
-	 * @param int    $object_id Object ID.
-	 * @param string $meta_key  Meta key.
-	 * @param bool   $single    Whether a single value was requested.
-	 * @param string $type      'post' or 'term'.
-	 * @return mixed
-	 */
-	private function filter_object_meta( $value, $object_id, $meta_key, $single, $type ) {
-		if ( $this->meta_guard || is_admin() || wp_doing_ajax() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) ) {
-			return $value;
-		}
-
-		$setting = ( 'term' === $type ) ? 'term_custom_fields' : 'post_custom_fields';
-		$fields  = (array) $this->settings->get( $setting );
-		if ( empty( $fields ) || ! in_array( $meta_key, $fields, true ) ) {
-			return $value;
-		}
-
-		/**
-		 * Allows disabling automatic linking of custom fields.
-		 *
-		 * @param bool   $enabled  Whether to link this field.
-		 * @param string $meta_key Meta key.
-		 * @param int    $object_id Object ID.
-		 * @param string $type     'post' or 'term'.
-		 */
-		if ( ! apply_filters( 'ilb_link_custom_fields', true, $meta_key, $object_id, $type ) ) {
-			return $value;
-		}
-
-		$source = array(
-			'id'   => (int) $object_id,
-			'type' => $type,
-		);
-		if ( ! $this->is_source_allowed( $source ) ) {
-			return $value;
-		}
-
-		// Hold the guard across the whole operation so neither the raw read nor
-		// the linking work re-enters this filter for the same field.
-		$this->meta_guard = true;
-		$raw              = get_metadata_raw( $type, $object_id, $meta_key, $single );
-
-		if ( null === $raw || '' === $raw || array() === $raw ) {
-			$this->meta_guard = false;
-			return $value;
-		}
-
-		if ( is_array( $raw ) ) {
-			$result = array_map(
-				function ( $item ) use ( $source ) {
-					return is_string( $item ) ? $this->link_html( $item, $source ) : $item;
-				},
-				$raw
-			);
-		} else {
-			$result = is_string( $raw ) ? $this->link_html( $raw, $source ) : $value;
-		}
-
-		$this->meta_guard = false;
-
-		return $result;
-	}
-
-	/**
-	 * Computes the cache fingerprint for a post's content.
-	 *
-	 * @param string $content Post content.
-	 * @param int    $post_id Source post ID.
-	 * @return string
-	 */
-	private function fingerprint( $content, $post_id ) {
-		return md5( $content . '|' . ILB_Index::token() . '|' . wp_json_encode( $this->settings->all() ) . '|' . $post_id );
 	}
 
 	/*

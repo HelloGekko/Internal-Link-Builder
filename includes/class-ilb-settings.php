@@ -150,24 +150,14 @@ class ILB_Settings {
 	 */
 	private function content_fields() {
 		return array(
-			'processing_mode'             => array(
-				'type'        => 'select',
-				'label'       => __( 'Processing mode', 'internal-link-builder' ),
-				'description' => __( 'Standard: links are injected through the content filters (post content, term descriptions, optional ACF/custom fields). Universal: the plugin processes the final rendered HTML of each page, so keywords are linked no matter how the content is produced — page builders, ACF, shortcodes or widgets. Universal mode bypasses the plugin output cache; use a page cache for performance.', 'internal-link-builder' ),
-				'default'     => 'standard',
-				'options'     => array(
-					'standard'  => __( 'Standard (content filters)', 'internal-link-builder' ),
-					'universal' => __( 'Universal (entire page output)', 'internal-link-builder' ),
-				),
-			),
-			'universal_selector'          => array(
+			'universal_selector'        => array(
 				'type'        => 'text',
-				'label'       => __( 'Content region for universal mode', 'internal-link-builder' ),
-				'description' => __( 'Optional. Comma-separated list of simple selectors (tag, #id or .class) that mark the content region, e.g. "main, #content, .entry-content". Leave empty for automatic detection (main, [role=main], #main, #content, #primary, then body). Navigation, header, footer and form elements are never linked.', 'internal-link-builder' ),
+				'label'       => __( 'Content region', 'internal-link-builder' ),
+				'description' => __( 'Optional. The plugin links keywords inside the rendered content region of each page. Comma-separated list of simple selectors (tag, #id or .class), e.g. "main, #content, .entry-content". Leave empty for automatic detection (main, [role=main], #main, #content, #primary, then body). Navigation, header, footer and form elements are never linked.', 'internal-link-builder' ),
 				'default'     => '',
 				'placeholder' => 'main, #content, .entry-content',
 			),
-			'whitelist_post_types'        => array(
+			'whitelist_post_types'      => array(
 				'type'        => 'token',
 				'token_mode'  => 'static',
 				'token_value' => 'slug',
@@ -177,7 +167,7 @@ class ILB_Settings {
 				'options'     => array( $this, 'post_type_options' ),
 				'placeholder' => __( 'Type a post type…', 'internal-link-builder' ),
 			),
-			'whitelist_taxonomies'        => array(
+			'whitelist_taxonomies'      => array(
 				'type'        => 'token',
 				'token_mode'  => 'static',
 				'token_value' => 'slug',
@@ -187,7 +177,7 @@ class ILB_Settings {
 				'options'     => array( $this, 'taxonomy_options' ),
 				'placeholder' => __( 'Type a taxonomy…', 'internal-link-builder' ),
 			),
-			'blacklist_posts'             => array(
+			'blacklist_posts'           => array(
 				'type'         => 'token',
 				'token_mode'   => 'ajax',
 				'token_source' => 'post',
@@ -197,13 +187,13 @@ class ILB_Settings {
 				'default'      => array(),
 				'placeholder'  => __( 'Type to search posts…', 'internal-link-builder' ),
 			),
-			'blacklist_child_pages'       => array(
+			'blacklist_child_pages'     => array(
 				'type'        => 'toggle',
 				'label'       => __( 'Blacklist also child pages of blacklisted pages', 'internal-link-builder' ),
 				'description' => '',
 				'default'     => 0,
 			),
-			'blacklist_terms'             => array(
+			'blacklist_terms'           => array(
 				'type'         => 'token',
 				'token_mode'   => 'ajax',
 				'token_source' => 'term',
@@ -213,7 +203,7 @@ class ILB_Settings {
 				'default'      => array(),
 				'placeholder'  => __( 'Type to search terms…', 'internal-link-builder' ),
 			),
-			'keyword_order'               => array(
+			'keyword_order'             => array(
 				'type'        => 'select',
 				'label'       => __( 'Order for configured keywords while linking', 'internal-link-builder' ),
 				'description' => __( 'Set the order of how your set keywords get used for building links.', 'internal-link-builder' ),
@@ -226,7 +216,7 @@ class ILB_Settings {
 					'lowest_char_count'  => __( 'Lowest character count gets linked first', 'internal-link-builder' ),
 				),
 			),
-			'max_links_per_post'          => array(
+			'max_links_per_post'        => array(
 				'type'        => 'number',
 				'label'       => __( 'Maximum amount of links per post', 'internal-link-builder' ),
 				'description' => __( 'For an unlimited number of links, set this value to 0.', 'internal-link-builder' ),
@@ -234,13 +224,13 @@ class ILB_Settings {
 				'min'         => 0,
 				'step'        => 1,
 			),
-			'limit_links_per_paragraph'   => array(
+			'limit_links_per_paragraph' => array(
 				'type'        => 'toggle',
 				'label'       => __( 'Limit links per paragraph', 'internal-link-builder' ),
 				'description' => __( 'Limit the links created per paragraph.', 'internal-link-builder' ),
 				'default'     => 0,
 			),
-			'max_links_per_paragraph'     => array(
+			'max_links_per_paragraph'   => array(
 				'type'        => 'number',
 				'label'       => __( 'Maximum amount of links per paragraph', 'internal-link-builder' ),
 				'description' => __( 'Set the maximum links per paragraph.', 'internal-link-builder' ),
@@ -249,7 +239,7 @@ class ILB_Settings {
 				'step'        => 1,
 				'depends_on'  => 'limit_links_per_paragraph',
 			),
-			'max_link_frequency'          => array(
+			'max_link_frequency'        => array(
 				'type'        => 'number',
 				'label'       => __( 'Maximum frequency of how often a post gets linked within another one', 'internal-link-builder' ),
 				'description' => __( 'For an unlimited number of links, set this value to 0.', 'internal-link-builder' ),
@@ -257,13 +247,13 @@ class ILB_Settings {
 				'min'         => 0,
 				'step'        => 1,
 			),
-			'limit_incoming_links'        => array(
+			'limit_incoming_links'      => array(
 				'type'        => 'toggle',
 				'label'       => __( 'Limit incoming links', 'internal-link-builder' ),
 				'description' => __( 'Globally set a limit for all posts/pages/terms on the number of incoming links each can have.', 'internal-link-builder' ),
 				'default'     => 0,
 			),
-			'max_incoming_links'          => array(
+			'max_incoming_links'        => array(
 				'type'        => 'number',
 				'label'       => __( 'Maximum incoming links', 'internal-link-builder' ),
 				'description' => __( 'The maximum number of links each post/page/term can have from other posts/pages/terms.', 'internal-link-builder' ),
@@ -272,32 +262,32 @@ class ILB_Settings {
 				'step'        => 1,
 				'depends_on'  => 'limit_incoming_links',
 			),
-			'link_as_often_as_possible'   => array(
+			'link_as_often_as_possible' => array(
 				'type'        => 'toggle',
 				'label'       => __( 'Link as often as possible', 'internal-link-builder' ),
 				'description' => __( 'Allows posts and keywords to get linked as often as possible. Deactivates all other restrictions.', 'internal-link-builder' ),
 				'default'     => 0,
 			),
-			'case_sensitive'              => array(
+			'case_sensitive'            => array(
 				'type'        => 'toggle',
 				'label'       => __( 'Case sensitive mode', 'internal-link-builder' ),
 				'description' => __( 'When this mode is on, keywords will be matched considering their case.', 'internal-link-builder' ),
 				'default'     => 0,
 			),
-			'exclude_html_areas'          => array(
+			'exclude_html_areas'        => array(
 				'type'        => 'multicheck',
 				'label'       => __( 'Exclude HTML areas from linking', 'internal-link-builder' ),
 				'description' => __( 'Content within the HTML tags configured here does not get used for linking.', 'internal-link-builder' ),
 				'default'     => array( 'headlines', 'strong' ),
 				'options'     => self::html_area_options(),
 			),
-			'consider_existing_links'     => array(
+			'consider_existing_links'   => array(
 				'type'        => 'toggle',
 				'label'       => __( 'Consideration of existing or manually created links', 'internal-link-builder' ),
 				'description' => __( 'Do not link already manually built link targets. Prevents links to URLs that are already linked in the content.', 'internal-link-builder' ),
 				'default'     => 1,
 			),
-			'limiting_taxonomies'         => array(
+			'limiting_taxonomies'       => array(
 				'type'        => 'token',
 				'token_mode'  => 'static',
 				'token_value' => 'slug',
@@ -306,46 +296,6 @@ class ILB_Settings {
 				'default'     => array(),
 				'options'     => array( $this, 'hierarchical_taxonomy_options' ),
 				'placeholder' => __( 'Type a taxonomy…', 'internal-link-builder' ),
-			),
-			'enable_custom_field_linking' => array(
-				'type'        => 'toggle',
-				'label'       => __( 'Enable custom field linking (advanced)', 'internal-link-builder' ),
-				'description' => __( 'Advanced: when enabled, the values of the custom fields configured below are filtered on the front end to inject links. Only enable this for fields whose value is displayed as text. Fields used for other purposes (URLs, CSS classes, numbers, internal data) can break your theme or other plugins.', 'internal-link-builder' ),
-				'default'     => 0,
-			),
-			'post_custom_fields'          => array(
-				'type'        => 'token',
-				'token_mode'  => 'freeform',
-				'token_value' => 'text',
-				'label'       => __( 'Custom fields of posts that get used for linking', 'internal-link-builder' ),
-				'description' => __( 'A list of post custom fields that should be used for automatic linking. Requires "Enable custom field linking" above. Type a meta key and press Enter. Leave empty to not link any custom fields.', 'internal-link-builder' ),
-				'default'     => array(),
-				'placeholder' => __( 'meta_key', 'internal-link-builder' ),
-				'depends_on'  => 'enable_custom_field_linking',
-			),
-			'term_custom_fields'          => array(
-				'type'        => 'token',
-				'token_mode'  => 'freeform',
-				'token_value' => 'text',
-				'label'       => __( 'Custom fields of terms that get used for linking', 'internal-link-builder' ),
-				'description' => __( 'A list of term custom fields that should be used for automatic linking. Requires "Enable custom field linking" above. Type a meta key and press Enter. Leave empty to not link any custom fields.', 'internal-link-builder' ),
-				'default'     => array(),
-				'placeholder' => __( 'meta_key', 'internal-link-builder' ),
-				'depends_on'  => 'enable_custom_field_linking',
-			),
-			'enable_acf_linking'          => array(
-				'type'        => 'toggle',
-				'label'       => __( 'Link keywords in ACF fields', 'internal-link-builder' ),
-				'description' => __( 'Requires Advanced Custom Fields. Links keywords inside the values of the selected ACF field types when they are displayed — including fields inside repeaters, groups and flexible content. Only enable field types whose values are shown as text; fields used inside HTML attributes should not be linked.', 'internal-link-builder' ),
-				'default'     => 0,
-			),
-			'acf_field_types'             => array(
-				'type'        => 'multicheck',
-				'label'       => __( 'ACF field types that get linked', 'internal-link-builder' ),
-				'description' => __( 'Keywords are only linked inside these ACF field types.', 'internal-link-builder' ),
-				'default'     => array( 'textarea', 'wysiwyg' ),
-				'options'     => array( 'ILB_ACF', 'field_type_options' ),
-				'depends_on'  => 'enable_acf_linking',
 			),
 		);
 	}
@@ -373,22 +323,6 @@ class ILB_Settings {
 	}
 
 	/**
-	 * Actions tab fields (the cache toggle is stored; buttons are not).
-	 *
-	 * @return array
-	 */
-	public function action_fields() {
-		return array(
-			'cache' => array(
-				'type'        => 'toggle',
-				'label'       => __( 'Cache', 'internal-link-builder' ),
-				'description' => __( 'Cache generated link output for faster front-end rendering.', 'internal-link-builder' ),
-				'default'     => 1,
-			),
-		);
-	}
-
-	/**
 	 * Returns a flat map of every field key => definition across all tabs.
 	 *
 	 * @return array<string,array>
@@ -398,7 +332,6 @@ class ILB_Settings {
 		foreach ( $this->fields() as $tab_fields ) {
 			$flat += $tab_fields;
 		}
-		$flat += $this->action_fields();
 
 		return $flat;
 	}
@@ -420,8 +353,6 @@ class ILB_Settings {
 				return $this->content_fields();
 			case 'links':
 				return $this->links_fields();
-			case 'actions':
-				return $this->action_fields();
 			default:
 				return $this->all_fields();
 		}

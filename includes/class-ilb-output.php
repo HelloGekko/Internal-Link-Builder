@@ -1,14 +1,11 @@
 <?php
 /**
- * Universal (whole-page) processing mode.
+ * Front-end page processing.
  *
  * Buffers the final HTML output of front-end pages and runs the linking engine
  * over the rendered document. Because this operates on the finished page, it
  * works regardless of how the content was produced — page builders, ACF,
  * shortcodes, widgets or custom templates.
- *
- * Enabled via the "Processing mode" setting. When active, the per-source
- * content filters are disabled (see ILB_Engine) to avoid double processing.
  *
  * @package InternalLinkBuilder
  */
@@ -60,13 +57,9 @@ class ILB_Output {
 	}
 
 	/**
-	 * Starts output buffering when universal mode applies to this request.
+	 * Starts output buffering when page processing applies to this request.
 	 */
 	public function maybe_buffer() {
-		if ( 'universal' !== $this->settings->get( 'processing_mode' ) ) {
-			return;
-		}
-
 		if ( is_admin() || is_feed() || is_robots() || is_embed() || is_preview() || is_customize_preview() || is_404() ) {
 			return;
 		}
