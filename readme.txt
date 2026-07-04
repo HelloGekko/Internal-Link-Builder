@@ -4,7 +4,7 @@ Tags: internal links, seo, automatic linking, interlinking, keywords
 Requires at least: 5.8
 Tested up to: 6.5
 Requires PHP: 7.4
-Stable tag: 0.9.0
+Stable tag: 0.10.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -46,6 +46,19 @@ an optional advanced custom-field linking mode for non-ACF meta.
    limits. The original content in the database is never changed.
 
 == Changelog ==
+
+= 0.10.0 =
+* New "Universal" processing mode: the plugin buffers the final rendered HTML
+  of each page and links keywords in the content region, regardless of how the
+  content is produced — page builders, ACF, shortcodes, widgets or custom
+  templates.
+* The content region is auto-detected (main, [role=main], #main, #content,
+  #primary, then body) and can be overridden with simple selectors; navigation,
+  header, footer, forms and other page chrome are never linked.
+* Works on singular pages and term archives; keeps the page's doctype and
+  UTF-8 output intact; falls back to the untouched page on any parsing issue.
+* Standard mode remains the default; in Universal mode the per-source content
+  filters are disabled to avoid double processing.
 
 = 0.9.0 =
 * Native Advanced Custom Fields integration: link keywords inside ACF field

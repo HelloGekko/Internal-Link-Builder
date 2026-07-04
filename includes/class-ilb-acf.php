@@ -76,6 +76,11 @@ class ILB_ACF {
 			return;
 		}
 
+		// Universal mode already processes the whole rendered page.
+		if ( 'universal' === $this->settings->get( 'processing_mode' ) ) {
+			return;
+		}
+
 		$allowed = array_keys( self::field_type_options() );
 		$types   = (array) $this->settings->get( 'acf_field_types' );
 

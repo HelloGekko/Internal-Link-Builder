@@ -104,6 +104,12 @@ class ILB_Engine {
 		$this->keywords = $keywords;
 		$this->links    = $links;
 
+		// In universal mode the whole page output is processed by ILB_Output, so
+		// the per-source content filters would only duplicate work.
+		if ( 'universal' === $this->settings->get( 'processing_mode' ) ) {
+			return;
+		}
+
 		// Run after wpautop (priority 10) so paragraphs exist as <p> elements.
 		add_filter( 'the_content', array( $this, 'filter_content' ), 20 );
 		add_filter( 'get_the_archive_description', array( $this, 'filter_term_description' ), 20 );
@@ -695,13 +701,6 @@ class ILB_Engine {
 	 * @return array|null
 	 */
 	private function resolve( $content, array $source ) {
-		$data       = $this->get_candidates( $source );
-		$candidates = $data['candidates'];
-		$lookup     = $data['lookup'];
-		if ( empty( $candidates ) ) {
-			return null;
-		}
-
 		$dom = $this->load_dom( $content );
 		if ( ! $dom ) {
 			return null;
@@ -713,7 +712,39 @@ class ILB_Engine {
 			return null;
 		}
 
+		$accepted = $this->resolve_in_root( $xpath, $root, $source );
+		if ( null === $accepted ) {
+			return null;
+		}
+
+		return array(
+			'dom'      => $dom,
+			'root'     => $root,
+			'accepted' => $accepted,
+		);
+	}
+
+	/**
+	 * Runs the matching pipeline inside an already-parsed DOM subtree.
+	 *
+	 * @param DOMXPath $xpath          XPath helper for the document.
+	 * @param DOMNode  $root           Subtree to process.
+	 * @param array    $source         Source descriptor.
+	 * @param array    $extra_excluded Additional always-excluded tag names.
+	 * @return array|null Accepted placements, or null when nothing is linkable.
+	 */
+	private function resolve_in_root( DOMXPath $xpath, $root, array $source, array $extra_excluded = array() ) {
+		$data       = $this->get_candidates( $source );
+		$candidates = $data['candidates'];
+		$lookup     = $data['lookup'];
+		if ( empty( $candidates ) ) {
+			return null;
+		}
+
 		$excluded = $this->excluded_tags();
+		foreach ( $extra_excluded as $tag ) {
+			$excluded[ $tag ] = true;
+		}
 
 		// Collect existing link URLs so we never duplicate a manual link.
 		$existing_urls = array();
@@ -747,13 +778,119 @@ class ILB_Engine {
 		}
 
 		$placements = $this->collect_placements( $text_nodes, $pattern, $lookup );
-		$accepted   = $this->select_placements( $placements, $source, $existing_urls );
 
-		return array(
-			'dom'      => $dom,
-			'root'     => $root,
-			'accepted' => $accepted,
-		);
+		return $this->select_placements( $placements, $source, $existing_urls );
+	}
+
+	/**
+	 * Links keywords inside a complete HTML document (universal mode).
+	 *
+	 * Parses the full page, locates the content region (the first match from
+	 * the root XPath list) and runs the regular pipeline inside it. Chrome such
+	 * as navigation, header, footer and forms is always excluded.
+	 *
+	 * @param string $html        Complete HTML document.
+	 * @param array  $source      Source descriptor (id, type).
+	 * @param array  $root_xpaths Optional XPath expressions for the content
+	 *                            region; the first match wins. Defaults to
+	 *                            common content wrappers, then body.
+	 * @return string
+	 */
+	public function link_document( $html, array $source, array $root_xpaths = array() ) {
+		if ( ! is_string( $html ) || '' === trim( $html ) || ! class_exists( 'DOMDocument' ) ) {
+			return $html;
+		}
+
+		if ( ! $this->is_source_allowed( $source ) ) {
+			return $html;
+		}
+
+		// Preserve the original doctype: the UTF-8 hint we prepend for libxml
+		// would otherwise displace it.
+		$doctype = '';
+		$body    = $html;
+		if ( preg_match( '/^\s*<!DOCTYPE[^>]*>/i', $html, $matches ) ) {
+			$doctype = trim( $matches[0] );
+			$body    = substr( $html, strlen( $matches[0] ) );
+		}
+
+		$dom  = new DOMDocument();
+		$prev = libxml_use_internal_errors( true );
+		$ok   = $dom->loadHTML( '<?xml encoding="UTF-8">' . $body, LIBXML_HTML_NODEFDTD );
+		libxml_clear_errors();
+		libxml_use_internal_errors( $prev );
+
+		if ( ! $ok ) {
+			return $html;
+		}
+
+		foreach ( iterator_to_array( $dom->childNodes ) as $child ) {
+			if ( XML_PI_NODE === $child->nodeType ) {
+				$dom->removeChild( $child );
+			}
+		}
+
+		$xpath = new DOMXPath( $dom );
+
+		if ( empty( $root_xpaths ) ) {
+			$root_xpaths = array(
+				'//main',
+				'//*[@role="main"]',
+				'//*[@id="main"]',
+				'//*[@id="content"]',
+				'//*[@id="primary"]',
+				'//body',
+			);
+		}
+
+		/**
+		 * Filters the XPath expressions used to locate the content region in
+		 * universal mode. The first expression that matches wins.
+		 *
+		 * @param string[] $root_xpaths XPath expressions.
+		 * @param array    $source      Source descriptor.
+		 */
+		$root_xpaths = apply_filters( 'ilb_universal_roots', $root_xpaths, $source );
+
+		$root = null;
+		foreach ( $root_xpaths as $expression ) {
+			$match = $xpath->query( $expression );
+			if ( $match && $match->length > 0 ) {
+				$root = $match->item( 0 );
+				break;
+			}
+		}
+
+		if ( ! $root ) {
+			return $html;
+		}
+
+		$accepted = $this->resolve_in_root( $xpath, $root, $source, self::document_chrome_tags() );
+		if ( empty( $accepted ) ) {
+			return $html;
+		}
+
+		$this->apply_placements( $dom, $accepted );
+
+		// Serialise from the root element rather than the document: the
+		// document serializer entity-encodes all non-ASCII characters, while
+		// the node serializer keeps the page's UTF-8 intact.
+		$output = $dom->documentElement ? $dom->saveHTML( $dom->documentElement ) : false;
+		if ( false === $output || '' === $output ) {
+			return $html;
+		}
+
+		return ( '' !== $doctype ) ? $doctype . "\n" . $output : $output;
+	}
+
+	/**
+	 * Tag names that are never linked in whole-document (universal) mode, on
+	 * top of the configured excluded areas: page chrome and form controls.
+	 *
+	 * @return string[]
+	 */
+	public static function document_chrome_tags() {
+		return array( 'head', 'title', 'nav', 'header', 'footer', 'aside', 'form', 'button', 'select', 'textarea', 'label', 'noscript', 'svg', 'iframe' );
 	}
 
 	/**

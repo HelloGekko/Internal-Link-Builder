@@ -150,6 +150,23 @@ class ILB_Settings {
 	 */
 	private function content_fields() {
 		return array(
+			'processing_mode'             => array(
+				'type'        => 'select',
+				'label'       => __( 'Processing mode', 'internal-link-builder' ),
+				'description' => __( 'Standard: links are injected through the content filters (post content, term descriptions, optional ACF/custom fields). Universal: the plugin processes the final rendered HTML of each page, so keywords are linked no matter how the content is produced — page builders, ACF, shortcodes or widgets. Universal mode bypasses the plugin output cache; use a page cache for performance.', 'internal-link-builder' ),
+				'default'     => 'standard',
+				'options'     => array(
+					'standard'  => __( 'Standard (content filters)', 'internal-link-builder' ),
+					'universal' => __( 'Universal (entire page output)', 'internal-link-builder' ),
+				),
+			),
+			'universal_selector'          => array(
+				'type'        => 'text',
+				'label'       => __( 'Content region for universal mode', 'internal-link-builder' ),
+				'description' => __( 'Optional. Comma-separated list of simple selectors (tag, #id or .class) that mark the content region, e.g. "main, #content, .entry-content". Leave empty for automatic detection (main, [role=main], #main, #content, #primary, then body). Navigation, header, footer and form elements are never linked.', 'internal-link-builder' ),
+				'default'     => '',
+				'placeholder' => 'main, #content, .entry-content',
+			),
 			'whitelist_post_types'        => array(
 				'type'        => 'token',
 				'token_mode'  => 'static',
