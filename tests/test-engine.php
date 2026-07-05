@@ -113,6 +113,16 @@ class Test_ILB_Engine extends WP_UnitTestCase {
 		unset( $target_id );
 	}
 
+	public function test_has_candidates_reflects_configured_keywords() {
+		ilb()->engine->flush_caches();
+		$this->assertFalse( ilb()->engine->has_candidates(), 'No keywords configured yet.' );
+
+		$this->make_target( array( 'ananas' ) );
+		ilb()->engine->flush_caches();
+
+		$this->assertTrue( ilb()->engine->has_candidates(), 'A keyword is now configured.' );
+	}
+
 	public function test_link_source_content_links_keyword_in_html_snippet() {
 		$target_id = $this->make_target( array( 'kiwi' ) );
 

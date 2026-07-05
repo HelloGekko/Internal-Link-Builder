@@ -4,7 +4,7 @@ Tags: internal links, seo, automatic linking, interlinking, keywords
 Requires at least: 5.8
 Tested up to: 6.5
 Requires PHP: 7.4
-Stable tag: 0.11.1
+Stable tag: 0.11.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,11 @@ region is processed; navigation, header, footer and forms are never touched.
    database is never changed.
 
 == Changelog ==
+
+= 0.11.2 =
+* Performance: pages are no longer buffered or parsed when no keywords are
+  configured, so installing the plugin without setting keywords adds no
+  front-end overhead.
 
 = 0.11.1 =
 * Add "Excerpts" to the excludable HTML areas. Because excerpts have no

@@ -69,6 +69,13 @@ class ILB_Output {
 			return;
 		}
 
+		// Nothing to link anywhere yet: don't buffer or parse the page at all.
+		// This keeps sites that installed the plugin but have not configured
+		// (or fully removed) keywords at full speed.
+		if ( ! $this->engine->has_candidates() ) {
+			return;
+		}
+
 		ob_start( array( $this, 'process' ) );
 	}
 

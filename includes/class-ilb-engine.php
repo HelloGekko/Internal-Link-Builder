@@ -107,6 +107,20 @@ class ILB_Engine {
 		$this->override_cache  = array();
 	}
 
+	/**
+	 * Whether any keywords are configured at all.
+	 *
+	 * Cheap early-out for the output processor: when the index holds no
+	 * keywords there is nothing to link on any page, so it never buffers or
+	 * parses the output. The candidate map is memoised per request and cached
+	 * by index token, so this costs at most one query per change.
+	 *
+	 * @return bool
+	 */
+	public function has_candidates() {
+		return ! empty( $this->base_candidates() );
+	}
+
 	/*
 	 * -------------------------------------------------------------------------
 	 * Public computation (used by the generator)
