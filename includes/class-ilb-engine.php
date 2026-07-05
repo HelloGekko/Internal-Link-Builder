@@ -512,6 +512,7 @@ class ILB_Engine {
 		foreach ( $extra_excluded as $tag ) {
 			$excluded[ $tag ] = true;
 		}
+		$excluded_classes = $this->excluded_classes();
 
 		// Collect existing link URLs so we never duplicate a manual link.
 		$existing_urls = array();
@@ -524,7 +525,7 @@ class ILB_Engine {
 		// Snapshot linkable text nodes with their paragraph bucket.
 		$text_nodes = array();
 		foreach ( $xpath->query( './/text()', $root ) as $node ) {
-			$paragraph = $this->paragraph_key( $node, $excluded );
+			$paragraph = $this->paragraph_key( $node, $excluded, $excluded_classes );
 			if ( null === $paragraph ) {
 				continue;
 			}
@@ -733,14 +734,49 @@ class ILB_Engine {
 	}
 
 	/**
+	 * Returns the set of lowercase CSS class names whose elements must be
+	 * skipped. Excerpts have no dedicated HTML tag, so they are matched by the
+	 * container classes themes conventionally use.
+	 *
+	 * @return array<string,bool>
+	 */
+	private function excluded_classes() {
+		if ( ! in_array( 'excerpt', (array) $this->settings->get( 'exclude_html_areas' ), true ) ) {
+			return array();
+		}
+
+		/**
+		 * Filters the CSS classes treated as excerpt containers when the
+		 * "Excerpts" area is excluded from linking.
+		 *
+		 * @param string[] $classes Class names (matched case-insensitively).
+		 */
+		$classes = (array) apply_filters(
+			'ilb_excerpt_classes',
+			array( 'entry-summary', 'excerpt', 'post-excerpt', 'entry-excerpt' )
+		);
+
+		$map = array();
+		foreach ( $classes as $class ) {
+			$class = strtolower( trim( (string) $class ) );
+			if ( '' !== $class ) {
+				$map[ $class ] = true;
+			}
+		}
+
+		return $map;
+	}
+
+	/**
 	 * Determines a text node's paragraph bucket, or null when it is not
 	 * linkable (inside an excluded area).
 	 *
-	 * @param DOMNode            $node     Text node.
-	 * @param array<string,bool> $excluded Excluded tag names.
+	 * @param DOMNode            $node             Text node.
+	 * @param array<string,bool> $excluded         Excluded tag names.
+	 * @param array<string,bool> $excluded_classes Excluded CSS class names.
 	 * @return string|null
 	 */
-	private function paragraph_key( $node, array $excluded ) {
+	private function paragraph_key( $node, array $excluded, array $excluded_classes = array() ) {
 		if ( '' === trim( $node->nodeValue ) ) {
 			return null;
 		}
@@ -756,6 +792,14 @@ class ILB_Engine {
 
 			if ( isset( $excluded[ $tag ] ) ) {
 				return null;
+			}
+
+			if ( $excluded_classes && $parent->hasAttribute( 'class' ) ) {
+				foreach ( preg_split( '/\s+/', strtolower( $parent->getAttribute( 'class' ) ) ) as $class ) {
+					if ( '' !== $class && isset( $excluded_classes[ $class ] ) ) {
+						return null;
+					}
+				}
 			}
 
 			if ( null === $paragraph && 'p' === $tag ) {

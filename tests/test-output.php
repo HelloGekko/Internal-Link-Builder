@@ -124,6 +124,51 @@ class Test_ILB_Output extends WP_UnitTestCase {
 		$this->assertSame( 0, substr_count( $out, 'href="' . get_permalink( $this->target_id ) . '"' ) );
 	}
 
+	public function test_excerpt_areas_are_excluded_when_configured() {
+		$settings                        = ILB_Settings::defaults();
+		$settings['whitelist_post_types'] = array( 'post', 'page' );
+		$settings['exclude_html_areas']  = array( 'excerpt' );
+		update_option( ILB_SETTINGS_OPTION, $settings );
+
+		$source_id = self::factory()->post->create( array( 'post_status' => 'publish' ) );
+
+		$html = '<!DOCTYPE html><html><head><title>x</title></head><body><main>'
+			. '<div class="entry-summary"><p>Een druif in de samenvatting.</p></div>'
+			. '<p>Een vijg in de gewone tekst.</p>'
+			. '</main></body></html>';
+
+		$out = ilb()->engine->link_document(
+			$html,
+			array(
+				'id'   => $source_id,
+				'type' => 'post',
+			)
+		);
+
+		// Keyword inside the excerpt container is skipped, the normal one links.
+		$this->assertSame( 0, substr_count( $out, 'href="' . get_permalink( $this->target_id ) . '"' ) );
+		$this->assertSame( 1, substr_count( $out, 'href="' . get_permalink( $this->target_two_id ) . '"' ) );
+	}
+
+	public function test_excerpt_areas_are_linked_when_not_excluded() {
+		$source_id = self::factory()->post->create( array( 'post_status' => 'publish' ) );
+
+		$html = '<!DOCTYPE html><html><head><title>x</title></head><body><main>'
+			. '<div class="entry-summary"><p>Een druif in de samenvatting.</p></div>'
+			. '</main></body></html>';
+
+		$out = ilb()->engine->link_document(
+			$html,
+			array(
+				'id'   => $source_id,
+				'type' => 'post',
+			)
+		);
+
+		// Default config does not exclude excerpts, so it links.
+		$this->assertSame( 1, substr_count( $out, 'href="' . get_permalink( $this->target_id ) . '"' ) );
+	}
+
 	public function test_selectors_to_xpaths_conversion() {
 		$this->assertSame(
 			array(

@@ -691,6 +691,7 @@ class ILB_Settings {
 			'em'         => __( 'Italic text (<em>, <i>)', 'internal-link-builder' ),
 			'cite'       => __( 'Inline quotes (<cite>)', 'internal-link-builder' ),
 			'code'       => __( 'Sourcecode (<code>)', 'internal-link-builder' ),
+			'excerpt'    => __( 'Excerpts (.entry-summary, .excerpt)', 'internal-link-builder' ),
 		);
 	}
 

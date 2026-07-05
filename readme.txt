@@ -4,7 +4,7 @@ Tags: internal links, seo, automatic linking, interlinking, keywords
 Requires at least: 5.8
 Tested up to: 6.5
 Requires PHP: 7.4
-Stable tag: 0.11.0
+Stable tag: 0.11.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,11 @@ region is processed; navigation, header, footer and forms are never touched.
    database is never changed.
 
 == Changelog ==
+
+= 0.11.1 =
+* Add "Excerpts" to the excludable HTML areas. Because excerpts have no
+  dedicated tag, they are matched by their container classes (.entry-summary,
+  .excerpt, .post-excerpt, .entry-excerpt), filterable via ilb_excerpt_classes.
 
 = 0.11.0 =
 * Simplification: whole-page processing is now THE way the plugin works — no
