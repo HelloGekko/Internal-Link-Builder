@@ -528,10 +528,17 @@ class ILB_Engine {
 		}
 		$excluded_classes = $this->excluded_classes();
 
-		// Collect existing link URLs so we never duplicate a manual link.
+		// Collect existing link URLs so we never duplicate a manual link. Only
+		// anchors in linkable regions count: a link in the navigation, header or
+		// footer is page chrome, not content, and must not block linking a
+		// keyword elsewhere. Without this, any target that appears in the menu
+		// would never be linked on themes whose content region is the whole body.
 		$existing_urls = array();
 		if ( $this->settings->get( 'consider_existing_links' ) ) {
 			foreach ( $xpath->query( './/a[@href]', $root ) as $anchor ) {
+				if ( $this->node_in_excluded_region( $anchor, $excluded, $excluded_classes ) ) {
+					continue;
+				}
 				$existing_urls[ $this->normalize_url( $anchor->getAttribute( 'href' ) ) ] = true;
 			}
 		}
@@ -804,16 +811,8 @@ class ILB_Engine {
 				break;
 			}
 
-			if ( isset( $excluded[ $tag ] ) ) {
+			if ( isset( $excluded[ $tag ] ) || $this->element_has_excluded_class( $parent, $excluded_classes ) ) {
 				return null;
-			}
-
-			if ( $excluded_classes && $parent->hasAttribute( 'class' ) ) {
-				foreach ( preg_split( '/\s+/', strtolower( $parent->getAttribute( 'class' ) ) ) as $class ) {
-					if ( '' !== $class && isset( $excluded_classes[ $class ] ) ) {
-						return null;
-					}
-				}
 			}
 
 			if ( null === $paragraph && 'p' === $tag ) {
@@ -829,6 +828,54 @@ class ILB_Engine {
 		}
 
 		return $paragraph;
+	}
+
+	/**
+	 * Whether an element carries one of the excluded CSS classes.
+	 *
+	 * @param DOMElement         $element          Element to inspect.
+	 * @param array<string,bool> $excluded_classes Excluded CSS class names.
+	 * @return bool
+	 */
+	private function element_has_excluded_class( DOMElement $element, array $excluded_classes ) {
+		if ( ! $excluded_classes || ! $element->hasAttribute( 'class' ) ) {
+			return false;
+		}
+
+		foreach ( preg_split( '/\s+/', strtolower( $element->getAttribute( 'class' ) ) ) as $class ) {
+			if ( '' !== $class && isset( $excluded_classes[ $class ] ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Whether a node sits inside an excluded region (an excluded tag or class),
+	 * using the same ancestor walk as {@see ILB_Engine::paragraph_key()}. Used to
+	 * decide whether an existing anchor counts as a real content link.
+	 *
+	 * @param DOMNode            $node             Node to test (its ancestors are walked).
+	 * @param array<string,bool> $excluded         Excluded tag names.
+	 * @param array<string,bool> $excluded_classes Excluded CSS class names.
+	 * @return bool
+	 */
+	private function node_in_excluded_region( $node, array $excluded, array $excluded_classes ) {
+		$parent = $node->parentNode;
+		while ( $parent instanceof DOMElement ) {
+			if ( 'ilb-root' === $parent->getAttribute( 'id' ) ) {
+				break;
+			}
+
+			if ( isset( $excluded[ strtolower( $parent->nodeName ) ] ) || $this->element_has_excluded_class( $parent, $excluded_classes ) ) {
+				return true;
+			}
+
+			$parent = $parent->parentNode;
+		}
+
+		return false;
 	}
 
 	/**

@@ -173,6 +173,54 @@ class Test_ILB_Output extends WP_UnitTestCase {
 		$this->assertSame( 1, substr_count( $out, 'href="' . get_permalink( $this->target_id ) . '"' ) );
 	}
 
+	public function test_navigation_link_to_target_does_not_block_content_linking() {
+		$source_id = self::factory()->post->create( array( 'post_status' => 'publish' ) );
+		$permalink = get_permalink( $this->target_id );
+
+		// No <main>: the content region falls back to the whole <body>, which on
+		// many themes contains the navigation. A menu link to the target is page
+		// chrome and must not count as an existing content link, otherwise the
+		// keyword would never be linked in the article body.
+		$html = '<!DOCTYPE html><html><head><title>x</title></head><body>'
+			. '<nav><a href="' . esc_url( $permalink ) . '">Menu</a></nav>'
+			. '<div class="entry-content"><p>Een druif in de tekst.</p></div>'
+			. '</body></html>';
+
+		$out = ilb()->engine->link_document(
+			$html,
+			array(
+				'id'   => $source_id,
+				'type' => 'post',
+			)
+		);
+
+		// The nav link stays and the body keyword is now linked too: two hrefs.
+		$this->assertSame( 2, substr_count( $out, 'href="' . $permalink . '"' ) );
+		$this->assertStringContainsString( '>druif</a>', $out );
+	}
+
+	public function test_existing_content_link_still_blocks_linking() {
+		$source_id = self::factory()->post->create( array( 'post_status' => 'publish' ) );
+		$permalink = get_permalink( $this->target_id );
+
+		// A genuine link to the target inside the content region must still
+		// suppress a second, automatic link to the same URL.
+		$html = '<!DOCTYPE html><html><head><title>x</title></head><body><main>'
+			. '<p>Al <a href="' . esc_url( $permalink ) . '">gelinkt</a> eerder.</p>'
+			. '<p>Een druif verderop.</p>'
+			. '</main></body></html>';
+
+		$out = ilb()->engine->link_document(
+			$html,
+			array(
+				'id'   => $source_id,
+				'type' => 'post',
+			)
+		);
+
+		$this->assertSame( 1, substr_count( $out, 'href="' . $permalink . '"' ) );
+	}
+
 	public function test_selectors_to_xpaths_conversion() {
 		$this->assertSame(
 			array(

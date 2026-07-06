@@ -4,7 +4,7 @@ Tags: internal links, seo, automatic linking, interlinking, keywords
 Requires at least: 5.8
 Tested up to: 6.5
 Requires PHP: 7.4
-Stable tag: 0.12.0
+Stable tag: 0.12.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,14 @@ region is processed; navigation, header, footer and forms are never touched.
    database is never changed.
 
 == Changelog ==
+
+= 0.12.1 =
+* Fix: keywords whose target page also appears in the navigation menu are now
+  linked again. On themes without a dedicated content wrapper (no <main>,
+  #content or #primary) the content region falls back to the whole <body>, so
+  the "consider existing links" check was picking up menu, header and footer
+  links and treating the target as "already linked". The existing-link scan now
+  ignores anchors in page chrome, matching where links are actually placed.
 
 = 0.12.0 =
 * Self-hosted updates: the plugin now checks a JSON manifest you host and
