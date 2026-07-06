@@ -250,6 +250,55 @@ class Test_ILB_Output extends WP_UnitTestCase {
 		$this->assertSame( 1, substr_count( $out, 'href="' . $permalink . '"' ) );
 	}
 
+	public function test_engine_report_records_pipeline_counts() {
+		$source_id = self::factory()->post->create( array( 'post_status' => 'publish' ) );
+
+		ilb()->engine->start_report();
+		$html = '<!DOCTYPE html><html><head><title>x</title></head><body><main>'
+			. '<p>Een druif in de tekst.</p></main></body></html>';
+		ilb()->engine->link_document(
+			$html,
+			array(
+				'id'   => $source_id,
+				'type' => 'post',
+			)
+		);
+
+		$report = ilb()->engine->last_report();
+		$this->assertSame( '//main', $report['content_region'] );
+		$this->assertSame( 2, $report['keywords_in_index'] );
+		$this->assertSame( 1, $report['keyword_matches_found'] );
+		$this->assertSame( 1, $report['links_placed'] );
+	}
+
+	public function test_debug_comment_is_added_for_admins_only() {
+		$source = array(
+			'id'   => self::factory()->post->create( array( 'post_status' => 'publish' ) ),
+			'type' => 'post',
+		);
+
+		$ref = new ReflectionProperty( ILB_Output::class, 'source' );
+		$ref->setAccessible( true );
+		$ref->setValue( ilb()->output, $source );
+
+		$html = '<!DOCTYPE html><html><head><title>x</title></head><body><main>'
+			. '<p>Een druif in de tekst.</p></main></body></html>';
+
+		// A regular visitor never sees the diagnostics.
+		wp_set_current_user( 0 );
+		$_GET['ilb-debug'] = '1';
+		$this->assertStringNotContainsString( 'Internal Link Builder debug', ilb()->output->process( $html ) );
+
+		// An administrator does.
+		$admin = self::factory()->user->create( array( 'role' => 'administrator' ) );
+		wp_set_current_user( $admin );
+		$out = ilb()->output->process( $html );
+		unset( $_GET['ilb-debug'] );
+
+		$this->assertStringContainsString( 'Internal Link Builder debug', $out );
+		$this->assertStringContainsString( '"links_placed":1', $out );
+	}
+
 	public function test_selectors_to_xpaths_conversion() {
 		$this->assertSame(
 			array(

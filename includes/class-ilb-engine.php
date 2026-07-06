@@ -80,6 +80,13 @@ class ILB_Engine {
 	private $base_token = null;
 
 	/**
+	 * Diagnostics for the most recent document run, or null when disabled.
+	 *
+	 * @var array|null
+	 */
+	private $report = null;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param ILB_Settings $settings Settings handler.
@@ -105,6 +112,34 @@ class ILB_Engine {
 		$this->base_token      = null;
 		$this->target_cache    = array();
 		$this->override_cache  = array();
+	}
+
+	/**
+	 * Enables diagnostics collection for the next document run. Used by the
+	 * admin-only front-end debug mode to explain what was (not) linked and why.
+	 */
+	public function start_report() {
+		$this->report = array();
+	}
+
+	/**
+	 * Returns the diagnostics gathered during the last document run.
+	 *
+	 * @return array
+	 */
+	public function last_report() {
+		return is_array( $this->report ) ? $this->report : array();
+	}
+
+	/**
+	 * Merges values into the diagnostics report when collection is enabled.
+	 *
+	 * @param array $data Values to record.
+	 */
+	private function note_report( array $data ) {
+		if ( is_array( $this->report ) ) {
+			$this->report = array_merge( $this->report, $data );
+		}
 	}
 
 	/**
@@ -518,6 +553,7 @@ class ILB_Engine {
 		$data       = $this->get_candidates( $source );
 		$candidates = $data['candidates'];
 		$lookup     = $data['lookup'];
+		$this->note_report( array( 'keywords_in_index' => count( $candidates ) ) );
 		if ( empty( $candidates ) ) {
 			return null;
 		}
@@ -557,6 +593,7 @@ class ILB_Engine {
 			);
 		}
 
+		$this->note_report( array( 'linkable_text_nodes' => count( $text_nodes ) ) );
 		if ( empty( $text_nodes ) ) {
 			return null;
 		}
@@ -567,6 +604,7 @@ class ILB_Engine {
 		}
 
 		$placements = $this->collect_placements( $text_nodes, $pattern, $lookup );
+		$this->note_report( array( 'keyword_matches_found' => count( $placements ) ) );
 
 		return $this->select_placements( $placements, $source, $existing_urls );
 	}
@@ -641,20 +679,31 @@ class ILB_Engine {
 		 */
 		$root_xpaths = apply_filters( 'ilb_universal_roots', $root_xpaths, $source );
 
-		$root = null;
+		$root    = null;
+		$matched = '';
 		foreach ( $root_xpaths as $expression ) {
 			$match = $xpath->query( $expression );
 			if ( $match && $match->length > 0 ) {
-				$root = $match->item( 0 );
+				$root    = $match->item( 0 );
+				$matched = $expression;
 				break;
 			}
 		}
+
+		$this->note_report(
+			array(
+				'source'          => $source['type'] . ':' . $source['id'],
+				'content_region'  => $root ? $matched : 'none matched',
+				'region_fallback' => '//body' === $matched,
+			)
+		);
 
 		if ( ! $root ) {
 			return $html;
 		}
 
 		$accepted = $this->resolve_in_root( $xpath, $root, $source, self::document_chrome_tags() );
+		$this->note_report( array( 'links_placed' => is_array( $accepted ) ? count( $accepted ) : 0 ) );
 		if ( empty( $accepted ) ) {
 			return $html;
 		}

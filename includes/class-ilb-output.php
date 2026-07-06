@@ -122,10 +122,56 @@ class ILB_Output {
 			return $html;
 		}
 
+		$debug = $this->is_debug_request();
+		if ( $debug ) {
+			$this->engine->start_report();
+		}
+
 		$linked = $this->engine->link_document( $html, $this->source, $this->root_xpaths() );
 
 		// Never let a processing problem blank the page.
-		return ( is_string( $linked ) && '' !== $linked ) ? $linked : $html;
+		$out = ( is_string( $linked ) && '' !== $linked ) ? $linked : $html;
+
+		return $debug ? $this->append_debug_comment( $out ) : $out;
+	}
+
+	/**
+	 * Whether the current request asked for the admin-only linking diagnostics.
+	 *
+	 * @return bool
+	 */
+	private function is_debug_request() {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only diagnostic, gated on capability.
+		return isset( $_GET['ilb-debug'] ) && current_user_can( 'manage_options' );
+	}
+
+	/**
+	 * Appends a machine-readable diagnostics comment describing what the engine
+	 * did on this page, so an administrator can see why keywords were or were not
+	 * linked (visible in "View source" as <!-- Internal Link Builder debug ... -->).
+	 *
+	 * @param string $html Page HTML.
+	 * @return string
+	 */
+	private function append_debug_comment( $html ) {
+		$report = $this->engine->last_report();
+
+		$report['limits'] = array(
+			'max_links_per_post'        => (int) $this->settings->get( 'max_links_per_post' ),
+			'max_link_frequency'        => (int) $this->settings->get( 'max_link_frequency' ),
+			'link_as_often_as_possible' => (int) (bool) $this->settings->get( 'link_as_often_as_possible' ),
+			'consider_existing_links'   => (int) (bool) $this->settings->get( 'consider_existing_links' ),
+			'exclude_html_areas'        => array_values( (array) $this->settings->get( 'exclude_html_areas' ) ),
+			'content_region_setting'    => (string) $this->settings->get( 'universal_selector' ),
+		);
+
+		$comment = "\n<!-- Internal Link Builder debug: " . wp_json_encode( $report ) . " -->\n";
+
+		if ( false !== stripos( $html, '</body>' ) ) {
+			return preg_replace( '/<\/body>/i', $comment . '</body>', $html, 1 );
+		}
+
+		return $html . $comment;
 	}
 
 	/**

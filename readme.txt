@@ -4,7 +4,7 @@ Tags: internal links, seo, automatic linking, interlinking, keywords
 Requires at least: 5.8
 Tested up to: 6.5
 Requires PHP: 7.4
-Stable tag: 0.13.1
+Stable tag: 0.14.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,14 @@ region is processed; navigation, header, footer and forms are never touched.
    database is never changed.
 
 == Changelog ==
+
+= 0.14.0 =
+* New admin-only linking diagnostics. Append ?ilb-debug=1 to any front-end URL
+  while logged in as an administrator and the page source ends with an
+  "Internal Link Builder debug" HTML comment reporting which content region was
+  matched (and whether it fell back to <body>), how many keywords are in the
+  index, how many matched on the page, how many links were placed and the
+  active link limits — so you can see exactly why keywords are or aren't linked.
 
 = 0.13.1 =
 * Recognise Elementor's post-excerpt widget (.elementor-widget-theme-post-excerpt)
