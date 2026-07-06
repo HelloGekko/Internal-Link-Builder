@@ -4,7 +4,7 @@ Tags: internal links, seo, automatic linking, interlinking, keywords
 Requires at least: 5.8
 Tested up to: 6.5
 Requires PHP: 7.4
-Stable tag: 0.13.0
+Stable tag: 0.13.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,12 @@ region is processed; navigation, header, footer and forms are never touched.
    database is never changed.
 
 == Changelog ==
+
+= 0.13.1 =
+* Recognise Elementor's post-excerpt widget (.elementor-widget-theme-post-excerpt)
+  as an excerpt container, so excerpts built with Elementor are excluded from
+  linking when the "Excerpts" area is turned off. Still filterable via
+  ilb_excerpt_classes.
 
 = 0.13.0 =
 * New "Daily" index generation mode (now the default): keywords are still

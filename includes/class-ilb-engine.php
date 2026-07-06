@@ -774,7 +774,13 @@ class ILB_Engine {
 		 */
 		$classes = (array) apply_filters(
 			'ilb_excerpt_classes',
-			array( 'entry-summary', 'excerpt', 'post-excerpt', 'entry-excerpt' )
+			array(
+				'entry-summary',
+				'excerpt',
+				'post-excerpt',
+				'entry-excerpt',
+				'elementor-widget-theme-post-excerpt',
+			)
 		);
 
 		$map = array();

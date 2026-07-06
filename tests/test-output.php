@@ -154,6 +154,35 @@ class Test_ILB_Output extends WP_UnitTestCase {
 		$this->assertSame( 1, substr_count( $out, 'href="' . get_permalink( $this->target_two_id ) . '"' ) );
 	}
 
+	public function test_elementor_excerpt_widget_is_excluded_when_configured() {
+		$settings                         = ILB_Settings::defaults();
+		$settings['whitelist_post_types'] = array( 'post', 'page' );
+		$settings['exclude_html_areas']   = array( 'excerpt' );
+		update_option( ILB_SETTINGS_OPTION, $settings );
+		ilb()->settings->flush_cache();
+
+		$source_id = self::factory()->post->create( array( 'post_status' => 'publish' ) );
+
+		// Elementor renders the post-excerpt widget as nested divs; the keyword
+		// container class sits on the outer widget wrapper.
+		$html = '<!DOCTYPE html><html><head><title>x</title></head><body><main>'
+			. '<div class="elementor-widget elementor-widget-theme-post-excerpt">'
+			. '<div class="elementor-widget-container"><p>Een druif in de widget-samenvatting.</p></div></div>'
+			. '<p>Een vijg in de gewone tekst.</p>'
+			. '</main></body></html>';
+
+		$out = ilb()->engine->link_document(
+			$html,
+			array(
+				'id'   => $source_id,
+				'type' => 'post',
+			)
+		);
+
+		$this->assertSame( 0, substr_count( $out, 'href="' . get_permalink( $this->target_id ) . '"' ) );
+		$this->assertSame( 1, substr_count( $out, 'href="' . get_permalink( $this->target_two_id ) . '"' ) );
+	}
+
 	public function test_excerpt_areas_are_linked_when_not_excluded() {
 		$source_id = self::factory()->post->create( array( 'post_status' => 'publish' ) );
 
