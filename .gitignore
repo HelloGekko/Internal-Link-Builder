@@ -3,3 +3,6 @@
 composer.lock
 .phpunit.result.cache
 *.log
+
+# Built plugin zips (the example manifest is tracked).
+/dist/*.zip

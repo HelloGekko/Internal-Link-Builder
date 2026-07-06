@@ -106,6 +106,13 @@ final class ILB_Plugin {
 	public $output;
 
 	/**
+	 * Self-hosted update handler.
+	 *
+	 * @var ILB_Updater
+	 */
+	public $updater;
+
+	/**
 	 * Retrieves the singleton instance.
 	 *
 	 * @return ILB_Plugin
@@ -144,6 +151,7 @@ final class ILB_Plugin {
 		require_once ILB_PLUGIN_DIR . 'includes/class-ilb-engine.php';
 		require_once ILB_PLUGIN_DIR . 'includes/class-ilb-output.php';
 		require_once ILB_PLUGIN_DIR . 'includes/class-ilb-generator.php';
+		require_once ILB_PLUGIN_DIR . 'includes/class-ilb-updater.php';
 		require_once ILB_PLUGIN_DIR . 'includes/class-ilb-admin-bar.php';
 		require_once ILB_PLUGIN_DIR . 'includes/class-ilb-actions.php';
 
@@ -170,6 +178,9 @@ final class ILB_Plugin {
 
 		$this->output = new ILB_Output( $this->settings, $this->engine );
 		$this->output->hooks();
+
+		$this->updater = new ILB_Updater( ILB_PLUGIN_FILE, ILB_VERSION );
+		$this->updater->hooks();
 
 		$this->admin_bar = new ILB_Admin_Bar( $this->settings );
 		$this->actions   = new ILB_Actions( $this->settings );

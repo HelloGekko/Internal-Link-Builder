@@ -4,7 +4,7 @@ Tags: internal links, seo, automatic linking, interlinking, keywords
 Requires at least: 5.8
 Tested up to: 6.5
 Requires PHP: 7.4
-Stable tag: 0.11.2
+Stable tag: 0.12.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,14 @@ region is processed; navigation, header, footer and forms are never touched.
    database is never changed.
 
 == Changelog ==
+
+= 0.12.0 =
+* Self-hosted updates: the plugin now checks a JSON manifest you host and
+  offers updates in wp-admin like any other plugin (no wordpress.org, no
+  license check). Configure the manifest URL with the ILB_UPDATE_URL constant
+  or the ilb_update_manifest_url filter; adds an Update URI header so a
+  colliding wordpress.org slug can never hijack updates. See UPDATES.md.
+* Add bin/build-zip.sh and .gitattributes to produce a clean distributable zip.
 
 = 0.11.2 =
 * Performance: pages are no longer buffered or parsed when no keywords are
