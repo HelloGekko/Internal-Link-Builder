@@ -279,6 +279,7 @@ final class ILB_Plugin {
 		// Stop any pending background generation; data removal is handled in
 		// uninstall.php and respects the "keep data on uninstall" setting.
 		ILB_Generator::cancel_all();
+		wp_clear_scheduled_hook( ILB_Generator::HOOK_DAILY );
 	}
 
 	/**

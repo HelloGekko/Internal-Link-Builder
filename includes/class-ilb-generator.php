@@ -27,6 +27,11 @@ class ILB_Generator {
 	const HOOK_BATCH = 'ilb_generate_index_batch';
 
 	/**
+	 * Recurring daily action that triggers a rebuild in "daily" mode.
+	 */
+	const HOOK_DAILY = 'ilb_generate_index_daily';
+
+	/**
 	 * Action Scheduler group.
 	 */
 	const GROUP = 'internal-link-builder';
@@ -81,16 +86,48 @@ class ILB_Generator {
 	public function hooks() {
 		add_action( self::HOOK_KICKOFF, array( $this, 'run_kickoff' ) );
 		add_action( self::HOOK_BATCH, array( $this, 'run_batch' ), 10, 2 );
+		add_action( self::HOOK_DAILY, array( $this, 'run_kickoff' ) );
 
 		add_action( 'wp_ajax_ilb_run_generation', array( $this, 'ajax_run_generation' ) );
 		add_action( 'wp_ajax_ilb_index_status', array( $this, 'ajax_index_status' ) );
 
+		$mode = $this->settings->get( 'index_generation_mode' );
+
 		// Automatic mode: any change that affects the index schedules a rebuild.
-		if ( 'automatic' === $this->settings->get( 'index_generation_mode' ) ) {
+		if ( 'automatic' === $mode ) {
 			add_action( 'save_post', array( $this, 'on_save_post' ), 20, 2 );
 			add_action( 'deleted_post', array( $this, 'schedule' ) );
 			add_action( 'ilb_keywords_saved', array( $this, 'schedule' ) );
 			add_action( 'update_option_' . ILB_SETTINGS_OPTION, array( $this, 'schedule' ) );
+		}
+
+		// Keep the once-a-day rebuild event in sync with the selected mode.
+		$this->sync_daily_schedule( $mode );
+	}
+
+	/**
+	 * Ensures the recurring daily rebuild event exists in "daily" mode and is
+	 * removed in every other mode. Self-healing: runs on each load, so switching
+	 * modes in the settings takes effect on the next request without extra hooks.
+	 *
+	 * @param string $mode Current index generation mode.
+	 */
+	private function sync_daily_schedule( $mode ) {
+		if ( ! function_exists( 'wp_next_scheduled' ) ) {
+			return;
+		}
+
+		$scheduled = wp_next_scheduled( self::HOOK_DAILY );
+
+		if ( 'daily' === $mode ) {
+			if ( ! $scheduled ) {
+				wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', self::HOOK_DAILY );
+			}
+			return;
+		}
+
+		if ( $scheduled ) {
+			wp_unschedule_event( $scheduled, self::HOOK_DAILY );
 		}
 	}
 

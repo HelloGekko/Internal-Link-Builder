@@ -2,9 +2,9 @@
 /**
  * Per-target keyword and override storage.
  *
- * Keywords and their per-target settings are stored in post/term meta. When the
- * index generation mode is "automatic", saving keywords also rebuilds the index
- * rows for that target.
+ * Keywords and their per-target settings are stored in post/term meta. In every
+ * mode except "none", saving keywords also rebuilds the keyword index rows for
+ * that target, so live linking reflects the change immediately.
  *
  * @package InternalLinkBuilder
  */
@@ -142,7 +142,10 @@ class ILB_Keywords {
 		$this->update_meta( $target_id, $target_type, self::META_SETTINGS, $overrides );
 		$this->update_meta( $target_id, $target_type, self::META_CONTENT_BLACKLIST, $content_blacklist );
 
-		if ( 'automatic' === $this->settings->get( 'index_generation_mode' ) ) {
+		// Keep the keyword index (which drives live linking) current on save in
+		// every mode except "none", so links keep working immediately regardless
+		// of when the heavy link-graph statistics are rebuilt.
+		if ( 'none' !== $this->settings->get( 'index_generation_mode' ) ) {
 			$this->index->rebuild_for_target( $target_id, $target_type, $keywords );
 		}
 

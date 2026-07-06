@@ -133,11 +133,12 @@ class ILB_Settings {
 			'index_generation_mode'  => array(
 				'type'        => 'select',
 				'label'       => __( 'Index generation mode', 'internal-link-builder' ),
-				'description' => __( 'Choose your preferred approach for generating the index. None: the index is not created by the plugin (you should set up a cronjob). Automatic: any change affecting the index automatically updates the index.', 'internal-link-builder' ),
-				'default'     => 'automatic',
+				'description' => __( 'How the link-graph statistics are rebuilt. Keywords are always linked live, so links keep working the moment you save. Daily (recommended): the statistics rebuild once a day and whenever you press "Generate now" — no rebuild on every change. Automatic: the statistics rebuild after every content or keyword change. None: the plugin never rebuilds anything on its own (set up your own cron or use the button).', 'internal-link-builder' ),
+				'default'     => 'daily',
 				'options'     => array(
 					'none'      => __( 'None', 'internal-link-builder' ),
-					'automatic' => __( 'Automatic', 'internal-link-builder' ),
+					'daily'     => __( 'Daily (recommended)', 'internal-link-builder' ),
+					'automatic' => __( 'Automatic (on every change)', 'internal-link-builder' ),
 				),
 			),
 		);

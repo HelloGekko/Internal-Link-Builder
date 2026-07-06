@@ -4,7 +4,7 @@ Tags: internal links, seo, automatic linking, interlinking, keywords
 Requires at least: 5.8
 Tested up to: 6.5
 Requires PHP: 7.4
-Stable tag: 0.12.1
+Stable tag: 0.13.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,17 @@ region is processed; navigation, header, footer and forms are never touched.
    database is never changed.
 
 == Changelog ==
+
+= 0.13.0 =
+* New "Daily" index generation mode (now the default): keywords are still
+  linked live the moment you save, but the heavy link-graph statistics rebuild
+  runs just once a day (via WP-Cron) and whenever you press "Generate now" —
+  no rebuild on every content or keyword change. This keeps busy sites fast
+  while adding lots of pages. "Automatic" (rebuild on every change) and "None"
+  remain available.
+* The keyword index that drives live linking is now kept current on save in
+  every mode except "None", so switching away from "Automatic" never stops
+  links from working.
 
 = 0.12.1 =
 * Fix: keywords whose target page also appears in the navigation menu are now
