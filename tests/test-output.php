@@ -31,6 +31,10 @@ class Test_ILB_Output extends WP_UnitTestCase {
 
 		ILB_Index::install();
 		ILB_Links::install();
+		// The option write above is a no-op when it matches the stored value,
+		// so the update_option hook does not fire; flush explicitly to drop any
+		// settings cache left over from a previous test.
+		ilb()->settings->flush_cache();
 		ilb()->engine->flush_caches();
 
 		$this->target_id = self::factory()->post->create(

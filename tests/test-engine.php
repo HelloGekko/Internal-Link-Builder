@@ -20,7 +20,10 @@ class Test_ILB_Engine extends WP_UnitTestCase {
 
 		// Reset in-memory engine caches between tests (the DB transaction the
 		// test harness uses rolls back the index token, which can otherwise make
-		// a memoised candidate map leak across tests).
+		// a memoised candidate map leak across tests). Flush the settings cache
+		// too: the option write above is a no-op when it matches the stored
+		// value, so its update_option hook does not fire.
+		ilb()->settings->flush_cache();
 		ilb()->engine->flush_caches();
 	}
 
