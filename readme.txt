@@ -4,7 +4,7 @@ Tags: internal links, seo, automatic linking, interlinking, keywords
 Requires at least: 5.8
 Tested up to: 6.5
 Requires PHP: 7.4
-Stable tag: 0.15.2
+Stable tag: 0.15.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,11 @@ region is processed; navigation, header, footer and forms are never touched.
    database is never changed.
 
 == Changelog ==
+
+= 0.15.3 =
+* The ?ilb-debug=1 diagnostics now also list the stored post/term blacklists, so
+  you can confirm from the front end whether the page you are viewing is actually
+  on the blacklist (compare the "source" id against "blacklist").
 
 = 0.15.2 =
 * The ?ilb-debug=1 diagnostics now report whether the current page was processed

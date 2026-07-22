@@ -157,6 +157,10 @@ class ILB_Output {
 		$report = $this->engine->last_report();
 
 		$report['plugin_version'] = ILB_VERSION;
+		$report['blacklist']      = array(
+			'posts' => array_values( array_map( 'intval', (array) $this->settings->get( 'blacklist_posts' ) ) ),
+			'terms' => array_values( array_map( 'intval', (array) $this->settings->get( 'blacklist_terms' ) ) ),
+		);
 		$report['limits']         = array(
 			'max_links_per_post'        => (int) $this->settings->get( 'max_links_per_post' ),
 			'max_link_frequency'        => (int) $this->settings->get( 'max_link_frequency' ),
