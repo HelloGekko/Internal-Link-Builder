@@ -268,25 +268,7 @@ class ILB_Engine {
 			return false;
 		}
 
-		$blacklist = array_map( 'intval', (array) $this->settings->get( 'blacklist_posts' ) );
-		if ( in_array( (int) $post->ID, $blacklist, true ) ) {
-			return false;
-		}
-
-		if ( $this->settings->get( 'blacklist_child_pages' ) ) {
-			foreach ( get_post_ancestors( $post->ID ) as $ancestor ) {
-				if ( in_array( (int) $ancestor, $blacklist, true ) ) {
-					return false;
-				}
-			}
-		}
-
-		$overrides = $this->get_overrides( $post->ID, 'post' );
-		if ( ! empty( $overrides['on_global_blacklist'] ) ) {
-			return false;
-		}
-
-		return true;
+		return ! $this->is_post_blacklisted( $post->ID );
 	}
 
 	/**
@@ -301,17 +283,65 @@ class ILB_Engine {
 			return false;
 		}
 
+		return ! $this->is_term_blacklisted( $term->term_id );
+	}
+
+	/**
+	 * Whether a post is blacklisted from linking entirely, i.e. it must neither
+	 * link out nor receive links. Covers the global post blacklist, blacklisted
+	 * ancestors (when enabled) and the per-target "on global blacklist" override.
+	 *
+	 * @param int $post_id Post ID.
+	 * @return bool
+	 */
+	private function is_post_blacklisted( $post_id ) {
+		$blacklist = array_map( 'intval', (array) $this->settings->get( 'blacklist_posts' ) );
+		if ( in_array( (int) $post_id, $blacklist, true ) ) {
+			return true;
+		}
+
+		if ( $this->settings->get( 'blacklist_child_pages' ) ) {
+			foreach ( get_post_ancestors( $post_id ) as $ancestor ) {
+				if ( in_array( (int) $ancestor, $blacklist, true ) ) {
+					return true;
+				}
+			}
+		}
+
+		$overrides = $this->get_overrides( $post_id, 'post' );
+		return ! empty( $overrides['on_global_blacklist'] );
+	}
+
+	/**
+	 * Whether a term is blacklisted from linking entirely (neither links out nor
+	 * receives links).
+	 *
+	 * @param int $term_id Term ID.
+	 * @return bool
+	 */
+	private function is_term_blacklisted( $term_id ) {
 		$blacklist = array_map( 'intval', (array) $this->settings->get( 'blacklist_terms' ) );
-		if ( in_array( (int) $term->term_id, $blacklist, true ) ) {
-			return false;
+		if ( in_array( (int) $term_id, $blacklist, true ) ) {
+			return true;
 		}
 
-		$overrides = $this->get_overrides( $term->term_id, 'term' );
-		if ( ! empty( $overrides['on_global_blacklist'] ) ) {
-			return false;
+		$overrides = $this->get_overrides( $term_id, 'term' );
+		return ! empty( $overrides['on_global_blacklist'] );
+	}
+
+	/**
+	 * Whether a target reference may receive links. Blacklisted posts/terms are
+	 * excluded from linking entirely, so they never appear as a link destination.
+	 *
+	 * @param array $ref Target reference (id, type).
+	 * @return bool
+	 */
+	private function is_target_allowed( array $ref ) {
+		if ( 'term' === $ref['type'] ) {
+			return ! $this->is_term_blacklisted( (int) $ref['id'] );
 		}
 
-		return true;
+		return ! $this->is_post_blacklisted( (int) $ref['id'] );
 	}
 
 	/*
@@ -545,11 +575,12 @@ class ILB_Engine {
 	 *
 	 * @param DOMXPath $xpath          XPath helper for the document.
 	 * @param DOMNode  $root           Subtree to process.
-	 * @param array    $source         Source descriptor.
-	 * @param array    $extra_excluded Additional always-excluded tag names.
+	 * @param array    $source                  Source descriptor.
+	 * @param array    $extra_excluded          Additional always-excluded tag names.
+	 * @param array    $extra_excluded_classes  Additional always-excluded CSS class names.
 	 * @return array|null Accepted placements, or null when nothing is linkable.
 	 */
-	private function resolve_in_root( DOMXPath $xpath, $root, array $source, array $extra_excluded = array() ) {
+	private function resolve_in_root( DOMXPath $xpath, $root, array $source, array $extra_excluded = array(), array $extra_excluded_classes = array() ) {
 		$data       = $this->get_candidates( $source );
 		$candidates = $data['candidates'];
 		$lookup     = $data['lookup'];
@@ -563,6 +594,12 @@ class ILB_Engine {
 			$excluded[ $tag ] = true;
 		}
 		$excluded_classes = $this->excluded_classes();
+		foreach ( $extra_excluded_classes as $class ) {
+			$class = strtolower( trim( (string) $class ) );
+			if ( '' !== $class ) {
+				$excluded_classes[ $class ] = true;
+			}
+		}
 
 		// Collect existing link URLs so we never duplicate a manual link. Only
 		// anchors in linkable regions count: a link in the navigation, header or
@@ -702,7 +739,7 @@ class ILB_Engine {
 			return $html;
 		}
 
-		$accepted = $this->resolve_in_root( $xpath, $root, $source, self::document_chrome_tags() );
+		$accepted = $this->resolve_in_root( $xpath, $root, $source, self::document_chrome_tags(), self::document_chrome_classes() );
 		$this->note_report( array( 'links_placed' => is_array( $accepted ) ? count( $accepted ) : 0 ) );
 		if ( empty( $accepted ) ) {
 			return $html;
@@ -729,6 +766,32 @@ class ILB_Engine {
 	 */
 	public static function document_chrome_tags() {
 		return array( 'head', 'title', 'nav', 'header', 'footer', 'aside', 'form', 'button', 'select', 'textarea', 'label', 'noscript', 'svg', 'iframe' );
+	}
+
+	/**
+	 * CSS class names whose elements are treated as page chrome in whole-document
+	 * mode and never linked, regardless of settings. Author boxes are bio blocks,
+	 * not article content, so keywords inside them should not be linked.
+	 *
+	 * @return string[]
+	 */
+	public static function document_chrome_classes() {
+		/**
+		 * Filters the CSS classes always excluded from linking as page chrome in
+		 * whole-document mode (matched case-insensitively on any ancestor).
+		 *
+		 * @param string[] $classes Class names.
+		 */
+		return (array) apply_filters(
+			'ilb_chrome_classes',
+			array(
+				'author-box',
+				'author-bio',
+				'post-author',
+				'elementor-author-box',
+				'elementor-widget-author-box',
+			)
+		);
 	}
 
 	/**
@@ -1123,6 +1186,11 @@ class ILB_Engine {
 		foreach ( $candidate['targets'] as $ref ) {
 			// Never link a source to itself.
 			if ( $ref['type'] === $source['type'] && (int) $ref['id'] === (int) $source['id'] ) {
+				continue;
+			}
+
+			// Blacklisted targets are excluded from linking entirely.
+			if ( ! $this->is_target_allowed( $ref ) ) {
 				continue;
 			}
 

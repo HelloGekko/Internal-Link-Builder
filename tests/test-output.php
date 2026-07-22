@@ -299,6 +299,53 @@ class Test_ILB_Output extends WP_UnitTestCase {
 		$this->assertStringContainsString( '"links_placed":1', $out );
 	}
 
+	public function test_author_box_is_excluded_from_linking() {
+		$source_id = self::factory()->post->create( array( 'post_status' => 'publish' ) );
+
+		// Elementor renders the author box as a widget; keywords in the author
+		// bio are chrome, not article content, and must not be linked.
+		$html = '<!DOCTYPE html><html><head><title>x</title></head><body><main>'
+			. '<div class="elementor-widget elementor-widget-author-box">'
+			. '<div class="elementor-widget-container"><p>Een druif in de auteur-bio.</p></div></div>'
+			. '<p>Een vijg in de gewone tekst.</p>'
+			. '</main></body></html>';
+
+		$out = ilb()->engine->link_document(
+			$html,
+			array(
+				'id'   => $source_id,
+				'type' => 'post',
+			)
+		);
+
+		$this->assertSame( 0, substr_count( $out, 'href="' . get_permalink( $this->target_id ) . '"' ) );
+		$this->assertSame( 1, substr_count( $out, 'href="' . get_permalink( $this->target_two_id ) . '"' ) );
+	}
+
+	public function test_blacklisted_target_does_not_receive_links() {
+		$settings                         = ILB_Settings::defaults();
+		$settings['whitelist_post_types'] = array( 'post', 'page' );
+		$settings['blacklist_posts']      = array( $this->target_id );
+		update_option( ILB_SETTINGS_OPTION, $settings );
+		ilb()->settings->flush_cache();
+
+		$source_id = self::factory()->post->create( array( 'post_status' => 'publish' ) );
+		$html      = '<!DOCTYPE html><html><head><title>x</title></head><body><main>'
+			. '<p>Een druif en een vijg in de tekst.</p></main></body></html>';
+
+		$out = ilb()->engine->link_document(
+			$html,
+			array(
+				'id'   => $source_id,
+				'type' => 'post',
+			)
+		);
+
+		// The blacklisted target is never linked; the other target still is.
+		$this->assertSame( 0, substr_count( $out, 'href="' . get_permalink( $this->target_id ) . '"' ) );
+		$this->assertSame( 1, substr_count( $out, 'href="' . get_permalink( $this->target_two_id ) . '"' ) );
+	}
+
 	public function test_selectors_to_xpaths_conversion() {
 		$this->assertSame(
 			array(

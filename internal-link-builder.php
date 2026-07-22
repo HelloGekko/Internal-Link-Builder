@@ -3,7 +3,7 @@
  * Plugin Name:       Internal Link Builder
  * Plugin URI:        https://hellogekko.nl/internal-link-builder
  * Description:        Automatically generates internal links in the front-end based on keywords configured on target posts, pages and terms.
- * Version:           0.14.0
+ * Version:           0.15.0
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            HelloGekko
@@ -24,7 +24,7 @@ defined( 'ABSPATH' ) || exit;
  * Constants
  * -----------------------------------------------------------------------------
  */
-define( 'ILB_VERSION', '0.14.0' );
+define( 'ILB_VERSION', '0.15.0' );
 define( 'ILB_PLUGIN_FILE', __FILE__ );
 define( 'ILB_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ILB_PLUGIN_URL', plugin_dir_url( __FILE__ ) );

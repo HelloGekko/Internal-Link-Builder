@@ -4,7 +4,7 @@ Tags: internal links, seo, automatic linking, interlinking, keywords
 Requires at least: 5.8
 Tested up to: 6.5
 Requires PHP: 7.4
-Stable tag: 0.14.0
+Stable tag: 0.15.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,17 @@ region is processed; navigation, header, footer and forms are never touched.
    database is never changed.
 
 == Changelog ==
+
+= 0.15.0 =
+* Author boxes are no longer linked. Author bio blocks are page chrome, not
+  article content, so their common container classes (.author-box, .author-bio,
+  .post-author, Elementor's .elementor-author-box / .elementor-widget-author-box)
+  are always excluded in whole-page processing. Filterable via ilb_chrome_classes.
+* Fix: a page on the "posts that should not be used for linking" blacklist is now
+  excluded from linking entirely — it no longer receives incoming links either.
+  Previously the blacklist only stopped a page from linking out, so blacklisted
+  pages could still be linked to. The per-target "on global blacklist" override
+  behaves the same way. (Terms blacklist likewise.)
 
 = 0.14.0 =
 * New admin-only linking diagnostics. Append ?ilb-debug=1 to any front-end URL
