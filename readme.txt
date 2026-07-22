@@ -4,7 +4,7 @@ Tags: internal links, seo, automatic linking, interlinking, keywords
 Requires at least: 5.8
 Tested up to: 6.5
 Requires PHP: 7.4
-Stable tag: 0.15.1
+Stable tag: 0.15.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,12 @@ region is processed; navigation, header, footer and forms are never touched.
    database is never changed.
 
 == Changelog ==
+
+= 0.15.2 =
+* The ?ilb-debug=1 diagnostics now report whether the current page was processed
+  as a link source (source_linked). A blacklisted or non-whitelisted page shows
+  source_linked=false, making clear that any links still visible on it are
+  manual/existing links the plugin never touches — not links it created.
 
 = 0.15.1 =
 * The ?ilb-debug=1 diagnostics now include the running plugin version, so you

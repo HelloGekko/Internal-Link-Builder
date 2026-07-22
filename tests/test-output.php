@@ -347,6 +347,36 @@ class Test_ILB_Output extends WP_UnitTestCase {
 		$this->assertSame( 1, substr_count( $out, 'href="' . get_permalink( $this->target_two_id ) . '"' ) );
 	}
 
+	public function test_blacklisted_source_is_skipped_and_manual_links_untouched() {
+		$source_id                        = self::factory()->post->create( array( 'post_status' => 'publish' ) );
+		$settings                         = ILB_Settings::defaults();
+		$settings['whitelist_post_types'] = array( 'post', 'page' );
+		$settings['blacklist_posts']      = array( $source_id );
+		update_option( ILB_SETTINGS_OPTION, $settings );
+		ilb()->settings->flush_cache();
+
+		ilb()->engine->start_report();
+		$html = '<!DOCTYPE html><html><head><title>x</title></head><body><main>'
+			. '<p>Een druif en een <a href="https://example.test/manual/">handmatige</a> link.</p>'
+			. '</main></body></html>';
+
+		$out = ilb()->engine->link_document(
+			$html,
+			array(
+				'id'   => $source_id,
+				'type' => 'post',
+			)
+		);
+
+		// The blacklisted source is not processed: no automatic link is added and
+		// the existing manual link is left exactly as it was.
+		$this->assertSame( 0, substr_count( $out, 'href="' . get_permalink( $this->target_id ) . '"' ) );
+		$this->assertStringContainsString( '<a href="https://example.test/manual/">handmatige</a>', $out );
+
+		$report = ilb()->engine->last_report();
+		$this->assertFalse( $report['source_linked'] );
+	}
+
 	public function test_selectors_to_xpaths_conversion() {
 		$this->assertSame(
 			array(

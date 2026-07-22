@@ -1,13 +1,13 @@
 {
     "name": "Internal Link Builder",
-    "version": "0.15.1",
+    "version": "0.15.2",
     "author": "HelloGekko",
     "homepage": "https://hellogekko.nl/internal-link-builder",
     "requires": "5.8",
     "tested": "6.5",
     "requires_php": "7.4",
     "last_updated": "2026-07-04 12:00:00",
-    "download_url": "https://hellogekko.nl/updates/internal-link-builder-0.15.1.zip",
+    "download_url": "https://hellogekko.nl/updates/internal-link-builder-0.15.2.zip",
     "sections": {
         "description": "Automatically generates internal links in the front-end based on configured keywords.",
         "changelog": "<h4>0.12.0</h4><ul><li>Self-hosted update mechanism.</li></ul>"

@@ -666,8 +666,16 @@ class ILB_Engine {
 		}
 
 		if ( ! $this->is_source_allowed( $source ) ) {
+			$this->note_report(
+				array(
+					'source'         => $source['type'] . ':' . $source['id'],
+					'source_linked'  => false,
+					'source_skipped' => 'this page is blacklisted or its type is not whitelisted, so no links are added to it (existing/manual links are left untouched)',
+				)
+			);
 			return $html;
 		}
+		$this->note_report( array( 'source_linked' => true ) );
 
 		// Preserve the original doctype: the UTF-8 hint we prepend for libxml
 		// would otherwise displace it.
