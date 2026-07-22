@@ -156,7 +156,8 @@ class ILB_Output {
 	private function append_debug_comment( $html ) {
 		$report = $this->engine->last_report();
 
-		$report['limits'] = array(
+		$report['plugin_version'] = ILB_VERSION;
+		$report['limits']         = array(
 			'max_links_per_post'        => (int) $this->settings->get( 'max_links_per_post' ),
 			'max_link_frequency'        => (int) $this->settings->get( 'max_link_frequency' ),
 			'link_as_often_as_possible' => (int) (bool) $this->settings->get( 'link_as_often_as_possible' ),

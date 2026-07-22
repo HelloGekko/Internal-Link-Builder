@@ -4,7 +4,7 @@ Tags: internal links, seo, automatic linking, interlinking, keywords
 Requires at least: 5.8
 Tested up to: 6.5
 Requires PHP: 7.4
-Stable tag: 0.15.0
+Stable tag: 0.15.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,11 @@ region is processed; navigation, header, footer and forms are never touched.
    database is never changed.
 
 == Changelog ==
+
+= 0.15.1 =
+* The ?ilb-debug=1 diagnostics now include the running plugin version, so you
+  can confirm from the front end which version is actually active (useful when a
+  page cache or a duplicate install makes an update look like it did not apply).
 
 = 0.15.0 =
 * Author boxes are no longer linked. Author bio blocks are page chrome, not

@@ -297,6 +297,7 @@ class Test_ILB_Output extends WP_UnitTestCase {
 
 		$this->assertStringContainsString( 'Internal Link Builder debug', $out );
 		$this->assertStringContainsString( '"links_placed":1', $out );
+		$this->assertStringContainsString( '"plugin_version":"' . ILB_VERSION . '"', $out );
 	}
 
 	public function test_author_box_is_excluded_from_linking() {
